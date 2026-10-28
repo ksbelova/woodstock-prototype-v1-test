@@ -1613,14 +1613,32 @@
     return Number.isFinite(back) ? base + face + back : null;
   }
 
+  function detailedFinishedThicknessMm() {
+    const state = calibrationState();
+    const base = state.enabled && state.valid ? state.baseThicknessAfterCalibrationMm : state.sourceBaseThicknessMm;
+    const face = selectedVeneerThickness();
+    if (!Number.isFinite(base) || !Number.isFinite(face)) return null;
+    const back = Number(form.veneeredSidesSelect.value) === 2
+      ? calibrationSideBThicknessMm()
+      : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection() : null;
+    if (!Number.isFinite(back)) return null;
+    const confirmed = confirmedFinishedThicknessAfterCalibrationMm(base);
+    return Number.isFinite(confirmed) ? confirmed : base + face + back;
+  }
+
   function edgeWidthFitsProduct(width) {
     const value = num(width);
     if (!Number.isFinite(value)) return false;
+    if (isDetailedPanelCalculation()) {
+      const thickness = detailedFinishedThicknessMm();
+      return Number.isFinite(thickness) && value > thickness;
+    }
     const finished = quickPanelFinishedThicknessMm();
     return Number.isFinite(finished) ? value + 1e-9 >= finished + 4 : value > minimumAttachedEdgeWidth();
   }
 
   function minimumAttachedEdgeWidth() {
+    if (isDetailedPanelCalculation()) return detailedFinishedThicknessMm();
     const finished = quickPanelFinishedThicknessMm();
     if (Number.isFinite(finished)) return finished;
     const state = calibrationState();
@@ -1681,6 +1699,7 @@
     else if (!Number.isFinite(width) || width <= 0) validationError = "Выберите или укажите ширину кромки.";
 
     if (!validationError && customOrder && Number.isFinite(manualOrderPricePerM2) && manualOrderPricePerM2 < 0) validationError = "Цена заказной кромки не может быть отрицательной.";
+    if (!validationError && isDetailedPanelCalculation() && which === "attached" && !Number.isFinite(detailedFinishedThicknessMm())) validationError = "Итоговая толщина изделия не определена: нужны подтверждённые толщины облицовки обеих сторон.";
     if (!validationError && (which === "attached" || isQuickStandardPanel() && which === "separate") && Number.isFinite(width) && !edgeWidthFitsProduct(width)) validationError = Number.isFinite(quickPanelFinishedThicknessMm())
       ? "Ширина кромки должна быть больше итоговой толщины изделия минимум на 4 мм."
       : "Ширина кромки должна превышать толщину детали.";
@@ -2680,7 +2699,9 @@
   }
 
   function detailedStandardFormatAllowed(format) {
-    if (!isDetailedPanelCalculation() || parseThicknessComposition(currentBaseThicknessRaw()).total !== 50) return true;
+    if (!isDetailedPanelCalculation()) return true;
+    if (Math.max(Number(format.length), Number(format.width)) > 3660) return false;
+    if (parseThicknessComposition(currentBaseThicknessRaw()).total !== 50) return true;
     return Math.max(Number(format.length), Number(format.width)) <= 2800 &&
       Math.min(Number(format.length), Number(format.width)) <= 1032;
   }
@@ -2920,6 +2941,7 @@
       if (!size) return null;
       const type = manufacturingTypeForSize(size);
       const thickness = parseThicknessComposition(currentBaseThicknessRaw()).total;
+      if (["standard", "allowance20"].includes(type) && thickness !== 50) return { maxLengthMm: 3660 };
       if (thickness === 50 && ["standard", "allowance20"].includes(type)) {
         return { maxLengthMm: 2800, maxWidthMm: 1032 };
       }
@@ -5048,7 +5070,10 @@
         panelWidthMm: group.width,
         quantity: group.quantity,
         surfaceCount: group.surfaceCount,
-        multiUsableWidthBySheetFormatMm: data?.meta?.multiVeneerUsableWidthBySheetFormatMm || {}
+        multiUsableWidthBySheetFormatMm: {
+          ...(isDetailedPanelCalculation() ? { "2500x640": { usableLengthMm: 2500, usableWidthMm: 620 } } : {}),
+          ...(data?.meta?.multiVeneerUsableWidthBySheetFormatMm || {})
+        }
       });
       const fixedMultiPurchase = isDetailedPanelCalculation() && group.item?.type === "multi";
       const requiredVeneerAreaM2 = Number.isFinite(num(automaticRequirement?.netAreaM2)) ? num(automaticRequirement.netAreaM2) : 0;
