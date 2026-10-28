@@ -131,7 +131,7 @@
     return row ? parseNumber(row.ratePerRunningM) : null;
   }
 
-  function edgeRateFor(data, baseId, thicknessRaw, edgeThickness, runningM) {
+  function edgeRateFor(data, baseId, thicknessRaw, edgeThickness, runningM, options = {}) {
     const fallbackBases = Array.isArray(data?.meta?.legacyOperationRateFallbackBaseIds)
       ? data.meta.legacyOperationRateFallbackBaseIds
       : ["mdf", "dsp"];
@@ -143,7 +143,8 @@
     if (!group) return null;
 
     const threshold = parseNumber(data?.meta?.edgeMachineThresholdRunningM) ?? 40;
-    const method = meters >= threshold ? "Machine" : "Manual";
+    const machine = options.machineThresholdExclusive ? meters > threshold : meters >= threshold;
+    const method = machine ? "Machine" : "Manual";
     const currentKey = `${group}${method}RatePerRunningM`;
     const currentRate = parseNumber(row[currentKey]);
     if (Number.isFinite(currentRate)) {
