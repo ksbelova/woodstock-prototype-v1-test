@@ -1455,8 +1455,10 @@
     const controls = edgeControls(which);
     const type = edgeTypeById(controls.typeSelect?.value);
     const group = edgeNameGroupForInput(which);
-    if (!type || !group) return null;
-    const candidates = edgeCatalogItems(type.id).filter((item) => normalizeEdgeLookup(item.veneerName || item.displayName) === normalizeEdgeLookup(group.displayName));
+    if (!type || !group || (isDetailedPanelCalculation() && which === "attached" && type.hasGlue === true)) return null;
+    const candidates = edgeCatalogItems(type.id).filter((item) =>
+      !(isDetailedPanelCalculation() && which === "attached" && item.hasGlue === true) &&
+      normalizeEdgeLookup(item.veneerName || item.displayName) === normalizeEdgeLookup(group.displayName));
     const boundId = controls.materialInput?.dataset?.catalogItemId || "";
     const bound = boundId ? candidates.find((item) => item.id === boundId) : null;
     if (type.thicknessMode === "none") return bound || candidates[0] || null;
@@ -1501,6 +1503,8 @@
     controls.thicknessSelect.disabled = false;
     if (Number.isFinite(previous) && values.some((value) => Math.abs(Number(value) - previous) < 0.001)) {
       controls.thicknessSelect.value = String(previous);
+    } else if (isDetailedPanelCalculation() && values.some(value => Number(value) === 1)) {
+      controls.thicknessSelect.value = "1";
     }
   }
 
@@ -1691,7 +1695,7 @@
       thicknessMm: Number.isFinite(thickness) ? thickness : null,
       thicknessApplicable: thicknessRequired,
       widthMm: Number.isFinite(width) ? width : null,
-      hasGlue: isQuickWallPanel() && which === "attached" ? false : item?.hasGlue ?? type?.hasGlue ?? null,
+      hasGlue: (isQuickWallPanel() || isDetailedPanelCalculation()) && which === "attached" ? false : item?.hasGlue ?? type?.hasGlue ?? null,
       hasFleece: item?.hasFleece ?? type?.hasFleece ?? null,
       catalogItem: item,
       catalogItemId: item?.id || null,
@@ -7836,7 +7840,7 @@
     data.edgeSides.forEach((x) => form.separateEdgeSidesSelect.add(new Option(x.name, x.id)));
     form.separateEdgeSidesSelect.value = "perimeter";
     (data.edgeTypes || []).forEach((x) => {
-      form.edgeTypeSelect.add(new Option(x.name, x.id));
+      if (!isDetailedPanelCalculation() || x.hasGlue !== true) form.edgeTypeSelect.add(new Option(x.name, x.id));
       form.separateEdgeTypeSelect.add(new Option(x.name, x.id));
     });
     syncEdgeThicknessOptions("attached", { preserve: false });
