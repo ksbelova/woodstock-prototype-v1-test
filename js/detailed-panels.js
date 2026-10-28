@@ -4627,23 +4627,52 @@
       }
     });
 
+    // Fixed MixMatch purchase is shared only by the same material.
+    const fixedMixMatchGroups = isDetailedPanelCalculation()
+      ? [...groupMap.values()].filter(group => (group.which === "B" ? layoutB : layout) === "mixmatch")
+      : [];
+    const mixMatchMaterialAreas = new Map();
+    fixedMixMatchGroups.forEach(group => {
+      const key = materialIdentity(group.item);
+      const area = group.contributions.reduce((sum, entry) => sum + (Number(entry.cleanArea) || 0), 0);
+      mixMatchMaterialAreas.set(key, (mixMatchMaterialAreas.get(key) || 0) + area);
+    });
+    const linkedMixMatchConsumptions = isDetailedPanelCalculation() ? existingSpecificationItems()
+      .filter(record => window.WoodstockSpecificationGroupId &&
+        (record.calculationGroupId || record.id) === window.WoodstockSpecificationGroupId)
+      .flatMap(record => (record.veneerConsumptions || []).filter(entry =>
+        (entry.side === "B" ? record.layoutBId : (record.layoutAId || record.layoutId)) === "mixmatch")) : [];
+    linkedMixMatchConsumptions.forEach(entry => {
+      const key = String(entry.materialId || entry.materialName);
+      if (mixMatchMaterialAreas.has(key)) mixMatchMaterialAreas.set(key,
+        mixMatchMaterialAreas.get(key) + (Number(entry.requiredVeneerAreaM2) || 0));
+    });
     groupMap.forEach((group) => {
       const requiredVeneerAreaM2 = group.contributions.reduce((sum, contribution) => sum + (Number(contribution.cleanArea) || 0), 0);
       const recommendationKnown = group.contributions.every((contribution) => Number.isFinite(contribution.recommendedArea));
       let recommendedVeneerAreaM2 = recommendationKnown
         ? group.contributions.reduce((sum, contribution) => sum + contribution.recommendedArea, 0)
         : null;
-      if (group.which === "B" && layoutB === "mixmatch" && layout !== layoutB) {
+      if (!isDetailedPanelCalculation() && group.which === "B" && layoutB === "mixmatch" && layout !== layoutB) {
         const totalBackArea = itemResults.reduce((sum, row) => sum + (row.veneerNetB || 0), 0);
         const minimumArea = num(data.meta.mixMatchDefaultVeneerAreaM2);
         recommendedVeneerAreaM2 = Math.max(totalBackArea, minimumArea || totalBackArea) * requiredVeneerAreaM2 / totalBackArea;
         group.contributions.forEach(contribution => { contribution.recommendedArea = recommendedVeneerAreaM2 * contribution.cleanArea / requiredVeneerAreaM2; contribution.row.veneerRecommendedB = contribution.recommendedArea; });
       }
+      const fixedMixMatch = fixedMixMatchGroups.includes(group);
+      if (fixedMixMatch) {
+        const materialArea = mixMatchMaterialAreas.get(materialIdentity(group.item));
+        recommendedVeneerAreaM2 = Math.max(50, materialArea) * requiredVeneerAreaM2 / materialArea;
+        group.contributions.forEach(entry => {
+          entry.recommendedArea = recommendedVeneerAreaM2 * entry.cleanArea / requiredVeneerAreaM2;
+          entry.row[entry.side === "B" ? "veneerRecommendedB" : "veneerRecommendedA"] = entry.recommendedArea;
+        });
+      }
       const recommendedWastePercent = Number.isFinite(recommendedVeneerAreaM2) && requiredVeneerAreaM2 > 0
         ? (recommendedVeneerAreaM2 / requiredVeneerAreaM2 - 1) * 100
         : null;
       const id = `veneer-actual:${group.key}`;
-      const actualVeneerAreaManual = priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = !fixedMixMatch && priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
       const actualVeneerAreaM2 = actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
       const complexLayoutMinimumApplies = ["diagonal45", "herringbone"].includes(group.which === "B" ? layoutB : layout) && Number.isFinite(recommendedVeneerAreaM2);
@@ -4679,12 +4708,13 @@
         which: group.which, sideKey: group.sideKey, sameAsA: group.sameAsA, pricingMode: group.pricingMode,
         requiredVeneerAreaM2, recommendedVeneerAreaM2, recommendedWastePercent,
         actualVeneerAreaM2, actualWasteAreaM2, actualWastePercent, actualVeneerAreaManual,
-        valid: actualValid, validationError, paidVeneerAreaM2: null, purchasedWholeSheets: null, materialCost: null
+        valid: actualValid, validationError, mixMatchControlled: fixedMixMatch, mixMatchMaterialAreaM2: fixedMixMatch ? Math.max(50, mixMatchMaterialAreas.get(materialIdentity(group.item))) : null, paidVeneerAreaM2: null, purchasedWholeSheets: null, materialCost: null
       };
       veneerConsumptions.push(consumption);
       veneerWasteAdjustments.push(consumption);
     });
 
+    if (fixedMixMatchGroups.length) warnings.push("MixMatch: минимальная закупка — 50 м² на каждый материал (ориентир для трёх пачек). Одинаковый шпон на сторонах А и Б объединяется.");
     veneerRequiredStandardA = itemResults.filter((row) => row.classificationId === "standard_request").reduce((sum, row) => sum + (row.veneerRequiredA || 0), 0);
     veneerRequiredStandardB = itemResults.filter((row) => row.classificationId === "standard_request").reduce((sum, row) => sum + (row.veneerRequiredB || 0), 0);
     veneerRequiredNonstandardA = itemResults.filter((row) => row.classificationId === "nonstandard").reduce((sum, row) => sum + (row.veneerRequiredA || 0), 0);
@@ -4708,7 +4738,7 @@
       ? Math.max(mixMatchGroupRequiredArea, Number.isFinite(mixMatchDefaultArea) && mixMatchDefaultArea > 0 ? mixMatchDefaultArea : mixMatchGroupRequiredArea)
       : null;
     const mixMatchOverrideId = "mixmatch:actualVeneerAreaM2";
-    const mixMatchChangedManually = priceAdjustmentOverrides.has(mixMatchOverrideId);
+    const mixMatchChangedManually = !isDetailedPanelCalculation() && priceAdjustmentOverrides.has(mixMatchOverrideId);
     const mixMatchManualArea = num(priceAdjustmentOverrides.get(mixMatchOverrideId));
     const mixMatchActualFaceArea = mixMatchChangedManually ? mixMatchManualArea : mixMatchAutomaticArea;
     const mixMatchValid = layout !== "mixmatch" || !mixMatchRequiredFaceArea || (
@@ -4737,7 +4767,7 @@
       validationError: mixMatchValidationError,
       scale: 1
     };
-    if (layout === "mixmatch" && selectedVeneerA && mixMatchRequiredFaceArea > 0 && Number.isFinite(mixMatchActualFaceArea) && mixMatchActualFaceArea > 0) {
+    if (!isDetailedPanelCalculation() && layout === "mixmatch" && selectedVeneerA && mixMatchRequiredFaceArea > 0 && Number.isFinite(mixMatchActualFaceArea) && mixMatchActualFaceArea > 0) {
       const automaticBasis = Core.veneerVolumeBasis(selectedVeneerA, mixMatchAutomaticArea);
       const actualBasis = Core.veneerVolumeBasis(selectedVeneerA, mixMatchActualFaceArea);
       mixMatchVeneerPricing = {
@@ -6754,7 +6784,16 @@
     }
 
     (result?.veneerConsumptions || []).forEach((consumption) => {
-      if (consumption.mixMatchControlled) return;
+      if (consumption.mixMatchControlled) {
+        if (isDetailedPanelCalculation()) {
+          const note = document.createElement("p");
+          note.className = "field__note";
+          note.textContent = `MixMatch · ${consumption.materialName}: оплачивается ${round(consumption.mixMatchMaterialAreaM2, 2)} м² на материал. Минимум — 50 м² (ориентир для трёх пачек); одинаковый шпон на сторонах А и Б объединяется.`;
+          form.priceAdjustmentsList.append(note);
+          rowCount += 1;
+        }
+        return;
+      }
       renderVeneerWasteAdjustmentControl(consumption);
       rowCount += 1;
     });
