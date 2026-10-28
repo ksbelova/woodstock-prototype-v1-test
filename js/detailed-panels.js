@@ -4954,18 +4954,20 @@
 
     const standardSheetGroupList = [...standardSheetGroups.values()].map((group) => {
       const automaticRequirement = Core.standardizedSheetVeneerRequirement(group.item, {
+        roundMultiSheetsPerPanel: isDetailedPanelCalculation(),
         panelLengthMm: group.length,
         panelWidthMm: group.width,
         quantity: group.quantity,
         surfaceCount: group.surfaceCount,
         multiUsableWidthBySheetFormatMm: data?.meta?.multiVeneerUsableWidthBySheetFormatMm || {}
       });
+      const fixedMultiPurchase = isDetailedPanelCalculation() && group.item?.type === "multi";
       const requiredVeneerAreaM2 = Number.isFinite(num(automaticRequirement?.netAreaM2)) ? num(automaticRequirement.netAreaM2) : 0;
       const physicalSheetAreaM2 = num(automaticRequirement?.physicalSheetAreaM2);
       const technicalSheets = num(automaticRequirement?.technicalSheets);
       const recommendedVeneerAreaM2 = automaticRequirement?.exact
         ? (Number.isFinite(technicalSheets) && Number.isFinite(physicalSheetAreaM2)
-          ? technicalSheets * physicalSheetAreaM2
+          ? (fixedMultiPurchase ? automaticRequirement.purchasedSheets : technicalSheets) * physicalSheetAreaM2
           : requiredVeneerAreaM2)
         : null;
       const recommendedWastePercent = Number.isFinite(recommendedVeneerAreaM2) && requiredVeneerAreaM2 > 0
@@ -4998,7 +5000,7 @@
         item.materialId === group.item?.id && item.side === sideKey && item.pricingMode === 'standard' &&
         item.panelSize?.lengthMm === group.length && item.panelSize?.widthMm === group.width
       );
-      if(linkedConsumptions.length && valid && physicalSheetAreaM2 > 0){
+      if(!fixedMultiPurchase && linkedConsumptions.length && valid && physicalSheetAreaM2 > 0){
         const batchActual = actualVeneerAreaM2 + linkedConsumptions.reduce((sum,item)=>sum+(Number(item.actualVeneerAreaM2)||0),0);
         const batchRequired = requiredVeneerAreaM2 + linkedConsumptions.reduce((sum,item)=>sum+(Number(item.requiredVeneerAreaM2)||0),0);
         const batchSheets = Math.ceil(batchActual / physicalSheetAreaM2 - 1e-9);
