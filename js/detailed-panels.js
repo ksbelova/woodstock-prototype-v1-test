@@ -3903,6 +3903,14 @@
       };
     }
 
+    if (isDetailedPanelCalculation()) {
+      return {
+        applies: true, id, thresholdMm, baselineClass, thickClass,
+        pricingMode: "production", requiresProductionCost: true,
+        automaticCoefficient: null, actualCoefficient: null, changedManually: false,
+        baselineRatePerM2: null, thickRatePerM2: null, manualRequired: false
+      };
+    }
     const baselineRatePerM2 = standardProductionRateForClass(thicknessRaw, sides, baselineClass, baseId);
     const thickRatePerM2 = standardProductionRateForClass(thicknessRaw, sides, thickClass, baseId);
     const automaticCoefficient = Number.isFinite(baselineRatePerM2) && baselineRatePerM2 > 0 && Number.isFinite(thickRatePerM2) && thickRatePerM2 > 0
@@ -3979,7 +3987,8 @@
   }
 
   function manufacturingCostFromProduction(size) {
-    return selectedBasePriceMode(size) === "production" || manufacturingTypeForSize(size) === "allowance20" ||
+    return (isDetailedPanelCalculation() && manufacturingTypeForSize(size) === "exact" && selectedVeneerThickness() >= 1.5) ||
+      selectedBasePriceMode(size) === "production" || manufacturingTypeForSize(size) === "allowance20" ||
       (needsLayoutSelection() && selectedLayout()?.requiresProductionCost) || backLayoutRequiresProduction() || isReadyShirt(selectedVeneerA) ||
       (Number(form.veneeredSidesSelect.value) === 2 && isReadyShirt(form.veneerBModeSelect.value === "same" ? selectedVeneerA : form.veneerBModeSelect.value === "other" ? selectedVeneerB : null));
   }
@@ -4124,7 +4133,12 @@
       veneerThickness: selectedVeneerThickness(),
       exactSizeRequired: exactNonstandardRequired
     });
-    if (thickVeneerWorkAdjustment.applies && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) {
+    if (thickVeneerWorkAdjustment.requiresProductionCost) {
+      requiresProductionCost = true;
+      requiresOperationProductionCost = true;
+      warnings.push("Точная деталь со шпоном от 1,5 мм: производственная стоимость определяется общей суммой на странице спецификации. Подтверждённая ставка толстого шпона есть только для стандарта; отношение стандартных ставок к деталировке не применяется. Шпон рассчитывается отдельно.");
+      hasPartialPrice = true;
+    } else if (thickVeneerWorkAdjustment.applies && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) {
       warnings.push("Для точного размера со шпоном от 1,5 мм не хватает пары стандартных ставок 0,6 мм / 1,5 мм+. Укажите коэффициент работы с толстым шпоном вручную в блоке корректировок цены.");
       hasPartialPrice = true;
     }
@@ -6174,6 +6188,7 @@
 
   function thickVeneerWorkAdjustmentLabel(adjustment) {
     if (!adjustment?.applies) return "";
+    if (adjustment.requiresProductionCost) return "В общей стоимости производства";
     if (!Number.isFinite(adjustment.actualCoefficient)) return "Требуется указать вручную";
     const actual = `× ${specNumber(adjustment.actualCoefficient, 4)}`;
     if (adjustment.changedManually) {
