@@ -149,6 +149,7 @@
     const base = selectedBase();
     const key = normalizeThicknessKey(currentBaseThicknessRaw());
     if (!base || !key) return null;
+    if (isDetailedPanelCalculation() && base.id === "mdf" && key === "6+6+6") return "production";
     const scenarios = data?.baseThicknessScenarioPriceModes?.[base.id]?.[key];
     if (scenarios && size) {
       const manufacturingType = manufacturingTypeForSize(size);
@@ -3859,6 +3860,7 @@
 
   function standardProductionRateRowFor(thicknessRaw, sides, veneerThickness = selectedVeneerThickness(), baseId = selectedBase()?.id || "mdf") {
     const key = normalizeThicknessKey(thicknessRaw);
+    if (isDetailedPanelCalculation() && baseId === "mdf" && key === "6+6+6") return null;
     const thicknessClass = Number.isFinite(veneerThickness) && veneerThickness >= 1.5 ? "1.5+" : "0.6";
     return (data?.standardProductionRates || []).find((item) => (
       item.baseId === baseId &&
