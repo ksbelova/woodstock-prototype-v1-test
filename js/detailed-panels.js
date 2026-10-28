@@ -136,6 +136,7 @@
 
   function baseThicknessOptions(base) {
     if (!base) return [];
+    if (isDetailedPanelCalculation() && base.id === "gsp") return [10];
     const own = window.WoodstockPanelsView?.thicknesses?.(base, data?.thicknesses?.[base.id], data) ?? data?.thicknesses?.[base.id];
     return Array.isArray(own) ? own : [];
   }
@@ -2149,6 +2150,10 @@
     recalc();
   }
 
+  function gspCalibrationIncluded(base = selectedBase()) {
+    return isDetailedPanelCalculation() && base?.id === "gsp";
+  }
+
   function calibrationConfigForBase(base = selectedBase()) {
     return base?.calibration || null;
   }
@@ -2167,6 +2172,7 @@
   }
 
   function calibrationSourceBaseThicknessMm() {
+    if (gspCalibrationIncluded()) return 10;
     const raw = currentBaseThicknessRaw();
     const sourceOverrides = calibrationConfigForBase()?.sourceThicknessByNominalMm || {};
     const confirmedSource = num(sourceOverrides[normalizeThicknessKey(raw)]);
@@ -2175,6 +2181,7 @@
   }
 
   function calibrationBaseThicknessAfterMm() {
+    if (gspCalibrationIncluded()) return 10;
     const value = num(form.calibrationTargetInput?.value);
     return Number.isFinite(value) ? value : null;
   }
@@ -2224,6 +2231,11 @@
   }
 
   function calibrationState(base = selectedBase()) {
+    if (gspCalibrationIncluded(base)) return {
+      enabled: true, includedInBase: true, sourceBaseThicknessMm: 10,
+      baseThicknessAfterCalibrationMm: 10, depthMm: 0, valid: true,
+      ratePerM2PerMm: 0, finishedProductThicknessMm: confirmedFinishedThicknessAfterCalibrationMm(10)
+    };
     const enabled = window.WoodstockPanelsView?.automaticOperations ? calibrationRequiredForBase(base) : calibrationAvailableForBase(base) && form.calibrationSelect?.value === "yes";
     const sourceBaseThicknessMm = calibrationSourceBaseThicknessMm();
     const baseThicknessAfterCalibrationMm = window.WoodstockPanelsView?.automaticOperations ? null : calibrationBaseThicknessAfterMm();
@@ -2255,6 +2267,22 @@
 
   function updateCalibrationUI() {
     const base = selectedBase();
+    if (gspCalibrationIncluded(base)) {
+      form.calibrationFields?.classList.remove("is-hidden");
+      form.calibrationSelect.value = "yes";
+      form.calibrationSelect.disabled = true;
+      form.calibrationSelect.classList.add("is-hidden");
+      form.calibrationTargetInput.value = "";
+      form.calibrationTargetField.classList.add("is-hidden");
+      form.calibrationDepthField?.classList.add("is-hidden");
+      form.calibrationRequiredNote?.classList.remove("is-hidden");
+      if (form.calibrationRequiredNote) form.calibrationRequiredNote.textContent = "Обязательная калибровка учтена в стоимости основы. ГСП — 10 мм.";
+      clearValidationFor(form.calibrationTargetInput, "calibrationTarget", form.calibrationTargetError);
+      calibrationForcedRequiredBaseId = base.id;
+      return;
+    }
+    form.calibrationSelect.classList.remove("is-hidden");
+    if (form.calibrationRequiredNote) form.calibrationRequiredNote.textContent = "Калибровка обязательна для выбранной основы.";
     const available = calibrationAvailableForBase(base);
     const required = calibrationRequiredForBase(base);
     form.calibrationFields?.classList.toggle("is-hidden", !available);
@@ -5616,12 +5644,12 @@
       ? calibrationDepth * calibrationRatePerM2PerMm
       : null;
     const calibrationFinishedProductThicknessMm = calibration.finishedProductThicknessMm;
-    let calibrationCost = calibrationEnabled ? null : 0;
+    let calibrationCost = calibration.includedInBase ? 0 : calibrationEnabled ? null : 0;
     let calibrationArea = 0;
-    let calibrationPricingStatus = calibrationEnabled ? "pending" : "not_required";
+    let calibrationPricingStatus = calibration.includedInBase ? "included_in_panel_price" : calibrationEnabled ? "pending" : "not_required";
     let calibrationRequiresProductionCost = false;
     let calibrationProductionArea = 0;
-    if (calibrationEnabled) {
+    if (calibrationEnabled && !calibration.includedInBase) {
       const calibrationTargetProvided = Number.isFinite(baseThicknessAfterCalibrationMm);
       if (!calibrationTargetProvided) {
         calibrationPricingStatus = window.WoodstockPanelsView?.automaticOperations ? "pending_production" : "missing_target";
@@ -6119,7 +6147,7 @@
       calibrationPricingStatus,
       calibrationRequiresProductionCost,
       calibrationProductionArea,
-      calibrationIncludedInProductionCost: calibrationRequiresProductionCost,
+      calibrationIncludedInProductionCost: calibrationRequiresProductionCost || calibration.includedInBase === true,
       calibrationFinishedProductThicknessMm,
       readyShirt: usesReadyShirt,
       readyShirtAssemblyRequired: usesReadyShirt,
@@ -6403,7 +6431,7 @@
 
     const tech = result.techOperations || {};
     if (tech.calibration) {
-      characteristics.push(specRow("Калибровка", "Да"));
+      characteristics.push(specRow("Калибровка", gspCalibrationIncluded() ? "Обязательная калибровка учтена в стоимости основы" : "Да"));
       if (Number.isFinite(tech.baseThicknessAfterCalibrationMm)) {
         characteristics.push(specRow("Толщина основы после калибровки", specMm(tech.baseThicknessAfterCalibrationMm), 1));
       }
@@ -6882,7 +6910,7 @@
       const finishedText = Number.isFinite(tech.calibrationFinishedProductThicknessMm)
         ? ` · итог изделия ${String(tech.calibrationFinishedProductThicknessMm).replace(".", ",")} мм`
         : "";
-      form.techCalibrationSummary.textContent = `${tech.calibrationRequired ? "обязательна · " : ""}${sourceText} → ${afterText} мм · ${depthText} · ${rateText} · ${costText}${finishedText}`;
+      form.techCalibrationSummary.textContent = gspCalibrationIncluded() ? "Обязательная калибровка учтена в стоимости основы · ГСП 10 мм" : `${tech.calibrationRequired ? "обязательна · " : ""}${sourceText} → ${afterText} мм · ${depthText} · ${rateText} · ${costText}${finishedText}`;
     }
   }
 
