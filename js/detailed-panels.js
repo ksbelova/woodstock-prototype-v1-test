@@ -3903,20 +3903,12 @@
       };
     }
 
-    if (isDetailedPanelCalculation()) {
-      return {
-        applies: true, id, thresholdMm, baselineClass, thickClass,
-        pricingMode: "production", requiresProductionCost: true,
-        automaticCoefficient: null, actualCoefficient: null, changedManually: false,
-        baselineRatePerM2: null, thickRatePerM2: null, manualRequired: false
-      };
-    }
     const baselineRatePerM2 = standardProductionRateForClass(thicknessRaw, sides, baselineClass, baseId);
     const thickRatePerM2 = standardProductionRateForClass(thicknessRaw, sides, thickClass, baseId);
     const automaticCoefficient = Number.isFinite(baselineRatePerM2) && baselineRatePerM2 > 0 && Number.isFinite(thickRatePerM2) && thickRatePerM2 > 0
       ? thickRatePerM2 / baselineRatePerM2
       : null;
-    const manualValue = num(priceAdjustmentOverrides.get(id));
+    const manualValue = isDetailedPanelCalculation() ? null : num(priceAdjustmentOverrides.get(id));
     const changedManually = Number.isFinite(manualValue) && manualValue > 0;
     const actualCoefficient = changedManually ? manualValue : automaticCoefficient;
 
@@ -3924,7 +3916,7 @@
       applies: true, id, thresholdMm, baselineClass, thickClass,
       automaticCoefficient, actualCoefficient, changedManually,
       baselineRatePerM2, thickRatePerM2,
-      manualRequired: !Number.isFinite(automaticCoefficient)
+      manualRequired: !isDetailedPanelCalculation() && !Number.isFinite(automaticCoefficient)
     };
   }
   function cuttingRateFor(thicknessRaw, baseId = selectedBase()?.id || "mdf") {
@@ -3987,7 +3979,12 @@
   }
 
   function manufacturingCostFromProduction(size) {
-    return (isDetailedPanelCalculation() && manufacturingTypeForSize(size) === "exact" && selectedVeneerThickness() >= 1.5) ||
+    return (isDetailedPanelCalculation() && manufacturingTypeForSize(size) === "exact" && selectedVeneerThickness() >= 1.5 &&
+      !Number.isFinite(thickVeneerWorkAdjustmentState({
+        baseId: selectedBase()?.id, thicknessRaw: currentBaseThicknessRaw(),
+        sides: Number(form.veneeredSidesSelect.value), veneerThickness: selectedVeneerThickness(),
+        exactSizeRequired: true
+      }).actualCoefficient)) ||
       selectedBasePriceMode(size) === "production" || manufacturingTypeForSize(size) === "allowance20" ||
       (needsLayoutSelection() && selectedLayout()?.requiresProductionCost) || backLayoutRequiresProduction() || isReadyShirt(selectedVeneerA) ||
       (Number(form.veneeredSidesSelect.value) === 2 && isReadyShirt(form.veneerBModeSelect.value === "same" ? selectedVeneerA : form.veneerBModeSelect.value === "other" ? selectedVeneerB : null));
@@ -4133,14 +4130,20 @@
       veneerThickness: selectedVeneerThickness(),
       exactSizeRequired: exactNonstandardRequired
     });
-    if (thickVeneerWorkAdjustment.requiresProductionCost) {
-      requiresProductionCost = true;
-      requiresOperationProductionCost = true;
-      warnings.push("Точная деталь со шпоном от 1,5 мм: производственная стоимость определяется общей суммой на странице спецификации. Подтверждённая ставка толстого шпона есть только для стандарта; отношение стандартных ставок к деталировке не применяется. Шпон рассчитывается отдельно.");
+    if (thickVeneerWorkAdjustment.applies && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) {
+      warnings.push(isDetailedPanelCalculation()
+        ? "Нет пары стандартных ставок для автоматического расчёта толстого шпона: требуется общая стоимость производства."
+        : "Для точного размера со шпоном от 1,5 мм не хватает пары стандартных ставок 0,6 мм / 1,5 мм+. Укажите коэффициент работы с толстым шпоном вручную в блоке корректировок цены.");
+      if (isDetailedPanelCalculation()) {
+        requiresProductionCost = true;
+        requiresOperationProductionCost = true;
+      }
       hasPartialPrice = true;
-    } else if (thickVeneerWorkAdjustment.applies && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) {
-      warnings.push("Для точного размера со шпоном от 1,5 мм не хватает пары стандартных ставок 0,6 мм / 1,5 мм+. Укажите коэффициент работы с толстым шпоном вручную в блоке корректировок цены.");
-      hasPartialPrice = true;
+    }
+    if (isDetailedPanelCalculation() && thickVeneerWorkAdjustment.applies &&
+        Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient) &&
+        classifiedSizes.some(({size}) => isExactFinishedDetail(size) && !manufacturingCostFromProduction(size))) {
+      warnings.push(thickVeneerEstimateNote());
     }
 
     if (!base) warnings.push("Не выбрана основа.");
@@ -6186,6 +6189,10 @@
     return (length / 1000) * (width / 1000) * (totalThickness / 1000) * quantity;
   }
 
+  function thickVeneerEstimateNote() {
+    return "Для точных деталей со шпоном от 1,5 мм стоимость основы и изготовления рассчитана с применением соотношения стандартных ставок толстого и тонкого шпона. Итоговая стоимость подлежит подтверждению производством.";
+  }
+
   function thickVeneerWorkAdjustmentLabel(adjustment) {
     if (!adjustment?.applies) return "";
     if (adjustment.requiresProductionCost) return "В общей стоимости производства";
@@ -6755,13 +6762,21 @@
       const note = Number.isFinite(thickWork.automaticCoefficient)
         ? `Авто по стандартным ставкам: ${money(thickWork.thickRatePerM2)}/м² ÷ ${money(thickWork.baselineRatePerM2)}/м² = × ${round(thickWork.automaticCoefficient, 4)}`
         : "Нет пары стандартных ставок 0,6 мм / 1,5 мм+ для этой основы, толщины и количества сторон.";
-      renderCoefficientAdjustmentControl({
-        id: thickWork.id,
-        name: "Коэффициент работы с толстым лицевым шпоном",
-        automaticCoefficient: thickWork.automaticCoefficient,
-        coefficient: thickWork.actualCoefficient,
-        note
-      });
+      if (isDetailedPanelCalculation()) {
+        const summary = document.createElement("p");
+        summary.className = "field__note";
+        summary.dataset.thickVeneerEstimate = "true";
+        summary.textContent = note + ". " + thickVeneerEstimateNote();
+        form.priceAdjustmentsList.append(summary);
+      } else {
+        renderCoefficientAdjustmentControl({
+          id: thickWork.id,
+          name: "Коэффициент работы с толстым лицевым шпоном",
+          automaticCoefficient: thickWork.automaticCoefficient,
+          coefficient: thickWork.actualCoefficient,
+          note
+        });
+      }
       rowCount += 1;
     }
 
