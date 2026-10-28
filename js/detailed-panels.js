@@ -1652,7 +1652,7 @@
     const priceRow = stockProgram ? item?.pricesPerRunningM?.[String(width)] : null;
     const orderRunningM = Number.isFinite(num(options.orderRunningM)) ? num(options.orderRunningM) : null;
     const automaticPrice = stockProgram ? automaticEdgePrice(priceRow, selectedClientConditionId, orderRunningM) : null;
-    const manualOrderPricePerM2 = customOrder ? num(controls.orderPriceInput?.value) : null;
+    const manualOrderPricePerM2 = !isDetailedPanelCalculation() && customOrder ? num(controls.orderPriceInput?.value) : null;
     const manualOrderPricePerRunningM = customOrder && Number.isFinite(manualOrderPricePerM2) && Number.isFinite(width)
       ? manualOrderPricePerM2 * width / 1000
       : null;
@@ -3694,7 +3694,7 @@
   }
 
   function separateEdgeMinimumMeters() {
-    return isQuickStandardPanel() ? 50 : num(data?.meta?.edgeSeparateMinimumRunningM);
+    return isDetailedPanelCalculation() ? null : isQuickStandardPanel() ? 50 : num(data?.meta?.edgeSeparateMinimumRunningM);
   }
 
   function separateEdgeAutomaticMeters() {
@@ -3718,6 +3718,10 @@
     form.separateEdgeMetersReset?.classList.toggle("is-hidden", !separateEdgeMetersManual);
     if (form.separateEdgeMetersSummary) form.separateEdgeMetersSummary.textContent =
       `${separateEdgeMetersManual ? "Ручная корректировка. " : ""}По размерам и выбранным торцам: ${round(meters, 2)} пог. м. Запас не добавлен.`;
+    if (isDetailedPanelCalculation()) {
+      setSeparateEdgeMetersWarning("Минимальный объём изготовления заказной кромки требует согласования.");
+      return;
+    }
     const selected = num(form.separateEdgeMetersInput.value);
     const minimum = separateEdgeMinimumMeters();
     setSeparateEdgeMetersWarning(Number.isFinite(selected) && selected > 0 && selected < minimum
@@ -3983,7 +3987,7 @@
       : edgeState.operationRateClass === "thick" ? 1.5
         : null;
     if (!Number.isFinite(tariffClassThickness)) return null;
-    return Core.edgeRateFor(data, baseId, thicknessRaw, tariffClassThickness, runningM);
+    return Core.edgeRateFor(data, baseId, thicknessRaw, tariffClassThickness, runningM, { machineThresholdExclusive: isDetailedPanelCalculation() });
   }
 
   function standardSheetPrices(standard, condition, warnings = []) {
@@ -4111,6 +4115,7 @@
       const limit = size.technologicalSizeLimit;
       warnings.push(`Позиция ${size.position}: ${isDetailedPanelCalculation() ? (manufacturingTypeForSize(size) === "exact" ? "чистовая деталь" : "полуфабрикат") : "нестандартная готовая деталь со шлифовкой, лаком и кромкой"} при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`);
     });
+    if (isDetailedPanelCalculation() && form.edgeModeSelect.value === "separate") warnings.push("Минимальный объём изготовления заказной кромки требует согласования.");
     const validSizes = sizes.filter((x) => x.sizeValid && x.length > 0 && x.width > 0 && x.quantityValid);
     const layoutSelectionRequired = needsLayoutSelection();
     const rawLayout = layoutSelectionRequired ? form.layoutSelect.value : "";
@@ -5499,18 +5504,19 @@
                 warnings.push(`Позиция ${item.position}: для выбранной складской кромки нет цены «${selection.conditionName}» на ширину ${selection.widthMm} мм.`);
               } else {
                 materialPendingOrder = true;
-                warnings.push(`Позиция ${item.position}: кромка отсутствует в складском прайсе; требуется согласование цены материала. Метраж сохранён, итог неполный.`);
+                warnings.push(`Позиция ${item.position}: кромка отсутствует в складском прайсе; цена заказной кромки не определена. Метраж сохранён, итог неполный.`);
               }
               hasPartialPrice = true;
             }
 
             const productionOperation = manufacturingCostFromProduction(validSizes.find((size) => size.rowId === item.rowId));
-            const groupEdgeMeters = attachedEdgeMeters + existingSpecificationItems().filter(record =>
+            const groupEdgeMeters = (isDetailedPanelCalculation() ? edge.geometricMeters : attachedEdgeMeters) + existingSpecificationItems().filter(record =>
               window.WoodstockSpecificationGroupId && (record.calculationGroupId || record.id) === window.WoodstockSpecificationGroupId && record.edge?.mode === "attached"
-            ).reduce((sum, record) => sum + (Number(record.edge.calculatedMeters) || 0), 0);
+            ).reduce((sum, record) => sum + (Number(isDetailedPanelCalculation() ? record.edge.geometricMeters : record.edge.calculatedMeters) || 0), 0);
             const rateInfo = productionOperation ? null : attachedEdgeRateFor(thickness.raw, selection, groupEdgeMeters, base?.id);
             if (rateInfo && Number.isFinite(rateInfo.rate)) {
-              const operationCost = meters * rateInfo.rate;
+              const operationMeters = isDetailedPanelCalculation() ? item.geometricMeters : meters;
+              const operationCost = operationMeters * rateInfo.rate;
               operationCostTotal += operationCost;
               operationRates.add(rateInfo.rate);
               operationMethods.add(rateInfo.method);
@@ -5518,7 +5524,7 @@
               breakdown.push({
                 label: `Кромление — операция · позиция ${item.position}`,
                 value: operationCost,
-                note: `${round(meters, 2)} пог. м × ${money(rateInfo.rate)}/пог. м · ${rateInfo.method === "machine" ? `станок (общий метраж от ${rateInfo.threshold} пог. м)` : rateInfo.method === "manual" ? `вручную (общий метраж до ${rateInfo.threshold} пог. м)` : "ранее подтверждённый тариф"}.`
+                note: `${round(operationMeters, 2)} пог. м × ${money(rateInfo.rate)}/пог. м · ${rateInfo.method === "machine" ? `станок (общий метраж ${isDetailedPanelCalculation() ? "свыше" : "от"} ${rateInfo.threshold} пог. м)` : rateInfo.method === "manual" ? `вручную (общий метраж до ${rateInfo.threshold} пог. м${isDetailedPanelCalculation() ? " включительно" : ""})` : "ранее подтверждённый тариф"}.`
               });
             } else if (productionOperation || operationPriceComesFromProduction(base)) {
               operationIncomplete = true;
@@ -7403,7 +7409,7 @@
       return `Цена не рассчитана: ${result.edge.validationError}`;
     }
     if (result.edge?.materialPricingStatus === "pending_order_price") {
-      return result.edge?.orderPosition ? "Требуется согласование цены заказной кромки. Метраж рассчитан; итог неполный." : "Цена не рассчитана: для выбранной кромки нет подтверждённой прайсовой цены.";
+      return result.edge?.orderPosition ? "Цена заказной кромки не определена. Метраж рассчитан; итог неполный." : "Цена не рассчитана: для выбранной кромки нет подтверждённой прайсовой цены.";
     }
     if (result.edge?.materialPricingStatus === "pending_condition_price") {
       return "Цена не рассчитана: для выбранной складской кромки отсутствует цена для выбранной ширины / условия.";
