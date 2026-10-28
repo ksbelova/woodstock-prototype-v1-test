@@ -7438,6 +7438,21 @@
     }
   }
 
+  function syncDetailedBevelAvailability() {
+    if (!isDetailedPanelCalculation()) return;
+    const thickVeneer = selectedVeneerThickness() >= 1.5;
+    const edgedRows = readSizeRows().map(effectiveEdgeForSize).filter(item => item.applies);
+    const thickEdge = edgedRows.length > 0
+      ? edgedRows.every(item => Number.isFinite(item.thicknessMm) && item.thicknessMm >= 1.5)
+      : currentEdgeThickness("attached") >= 1.5;
+    const available = thickVeneer || thickEdge;
+    form.edgeBevelSelect.disabled = !available;
+    if (!available) form.edgeBevelSelect.value = "no";
+    const note = document.getElementById("edgeBevelNote");
+    if (note) note.textContent = (available ? "" : "Фаска доступна только при толстом шпоне или толстой кромке. ") +
+      "Стоимость фаски определяется производством в составе общей суммы работ.";
+  }
+
   function recalc() {
     syncQuickWallBack();
     syncQuickPaperBack();
@@ -7452,6 +7467,7 @@
     syncPositionEdgeStateWithRows();
     if (edgeModeChangedByAvailability || isQuickWallPanel()) syncEdgeModeFields();
     if (form.edgeModeSelect.value === "attached" && positionEdgeOverridesEnabled) renderPositionEdgeOverrides();
+    syncDetailedBevelAvailability();
     syncVeneerActualOverridesWithDemand();
     lastCalculation = calculate();
     if (!lastCalculation) {
