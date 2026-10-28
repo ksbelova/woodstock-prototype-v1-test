@@ -2646,6 +2646,12 @@
     return (Number(length) / 1000) * (Number(width) / 1000) * (thickness.total / 1000) * density;
   }
 
+  function detailedStandardFormatAllowed(format) {
+    if (!isDetailedPanelCalculation() || parseThicknessComposition(currentBaseThicknessRaw()).total !== 50) return true;
+    return Math.max(Number(format.length), Number(format.width)) <= 2800 &&
+      Math.min(Number(format.length), Number(format.width)) <= 1032;
+  }
+
   function standardSizesForBase() {
     const base = selectedBase();
     if (!base) return [];
@@ -2683,11 +2689,11 @@
         const key = `${Number(item.length)}x${Number(item.width)}`;
         if (seen.has(key)) return false;
         seen.add(key);
-        return true;
+        return detailedStandardFormatAllowed(item);
       });
     }
 
-    return legacyStandardSizesForBase();
+    return legacyStandardSizesForBase().filter(detailedStandardFormatAllowed);
   }
 
   function physicalStandardSizes() {
@@ -2877,6 +2883,18 @@
   }
 
   function finishedDetailTechnologicalLimit(size) {
+    if (isDetailedPanelCalculation()) {
+      if (!size) return null;
+      const type = manufacturingTypeForSize(size);
+      const thickness = parseThicknessComposition(currentBaseThicknessRaw()).total;
+      if (thickness === 50 && ["standard", "allowance20"].includes(type)) {
+        return { maxLengthMm: 2800, maxWidthMm: 1032 };
+      }
+      if (type !== "exact" || !Number.isFinite(thickness)) return null;
+      return (data?.meta?.finishedDetailLimits || []).find(limit =>
+        thickness >= (num(limit.minThicknessMm) === 20 ? 22 : num(limit.minThicknessMm)) &&
+        thickness <= num(limit.maxThicknessMm)) || null;
+    }
     if (!size || manufacturingTypeForSize(size) !== "exact") return null;
     if (classifySize(size).id !== "nonstandard") return null;
     if (form.edgeModeSelect.value !== "attached") return null;
@@ -4045,7 +4063,9 @@
               : technologicalSizeInvalidRows.length
               ? (() => {
                   const limit = technologicalSizeInvalidRows[0].technologicalSizeLimit;
-                  return `Для нестандартной готовой детали со шлифовкой, лаком и кромкой при этой толщине максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`;
+                  return isDetailedPanelCalculation()
+                    ? `Для выбранного типа изготовления при этой толщине максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`
+                    : `Для нестандартной готовой детали со шлифовкой, лаком и кромкой при этой толщине максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`;
                 })()
               : ""
     };
@@ -4055,7 +4075,7 @@
     if (transitionDescriptionInvalidRows.length) warnings.push("Добавьте описание перехода рисунка или приложите файл.");
     technologicalSizeInvalidRows.forEach((size) => {
       const limit = size.technologicalSizeLimit;
-      warnings.push(`Позиция ${size.position}: нестандартная готовая деталь со шлифовкой, лаком и кромкой при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`);
+      warnings.push(`Позиция ${size.position}: ${isDetailedPanelCalculation() ? (manufacturingTypeForSize(size) === "exact" ? "чистовая деталь" : "полуфабрикат") : "нестандартная готовая деталь со шлифовкой, лаком и кромкой"} при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`);
     });
     const validSizes = sizes.filter((x) => x.sizeValid && x.length > 0 && x.width > 0 && x.quantityValid);
     const layoutSelectionRequired = needsLayoutSelection();
