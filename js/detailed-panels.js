@@ -2968,6 +2968,12 @@
     )) || null;
   }
 
+  function technologicalLimitDescription(limit) {
+    const length = num(limit?.maxLengthMm);
+    const width = num(limit?.maxWidthMm);
+    return Number.isFinite(width) ? "максимум " + length + " × " + width + " мм" : "максимальная длина " + length + " мм";
+  }
+
   function finishedDetailTechnologicalSizeState(size) {
     const limit = finishedDetailTechnologicalLimit(size);
     if (!limit) return { valid: true, limit: null };
@@ -4126,7 +4132,7 @@
               ? (() => {
                   const limit = technologicalSizeInvalidRows[0].technologicalSizeLimit;
                   return isDetailedPanelCalculation()
-                    ? `Для выбранного типа изготовления при этой толщине максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`
+                    ? `Для выбранного типа изготовления при этой толщине ${technologicalLimitDescription(limit)}.`
                     : `Для нестандартной готовой детали со шлифовкой, лаком и кромкой при этой толщине максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`;
                 })()
               : ""
@@ -4137,7 +4143,7 @@
     if (transitionDescriptionInvalidRows.length) warnings.push("Добавьте описание перехода рисунка или приложите файл.");
     technologicalSizeInvalidRows.forEach((size) => {
       const limit = size.technologicalSizeLimit;
-      warnings.push(`Позиция ${size.position}: ${isDetailedPanelCalculation() ? (manufacturingTypeForSize(size) === "exact" ? "чистовая деталь" : "полуфабрикат") : "нестандартная готовая деталь со шлифовкой, лаком и кромкой"} при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — максимум ${limit?.maxLengthMm || "—"} × ${limit?.maxWidthMm || "—"} мм.`);
+      warnings.push(`Позиция ${size.position}: ${isDetailedPanelCalculation() ? (manufacturingTypeForSize(size) === "exact" ? "чистовая деталь" : "полуфабрикат") : "нестандартная готовая деталь со шлифовкой, лаком и кромкой"} при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — ${technologicalLimitDescription(limit)}.`);
     });
     if (isDetailedPanelCalculation() && form.edgeModeSelect.value === "separate") warnings.push("Минимальный объём изготовления заказной кромки требует согласования.");
     const validSizes = sizes.filter((x) => x.sizeValid && x.length > 0 && x.width > 0 && x.quantityValid);
@@ -6529,7 +6535,7 @@
       form.specPricePerPiece.textContent = money(result.avgPiece);
       form.specTotal.textContent = money(result.finalTotal);
       form.specVat.textContent = `В том числе НДС 22%: ${money(result.vat)}`;
-    } else if (result.requiresProductionCost) {
+    } else if (result.requiresProductionCost && !(isDetailedPanelCalculation() && result.sizeValidation?.valid === false)) {
       form.specPricePerM2.textContent = "—";
       form.specPricePerPiece.textContent = "—";
       form.specTotal.textContent = "Требуется стоимость производства";
@@ -7553,7 +7559,7 @@
       form.finalPriceNote.textContent = lastCalculation.manualDiscountApplied
         ? `Ручная скидка ${round(lastCalculation.manualDiscountPercent, 1)}% применена к розничной цене.`
         : "";
-    } else if (lastCalculation.requiresProductionCost) {
+    } else if (lastCalculation.requiresProductionCost && !(isDetailedPanelCalculation() && lastCalculation.sizeValidation?.valid === false)) {
       form.retailPriceValue.textContent = "—";
       form.finalPriceValue.textContent = "Требуется стоимость производства";
       form.finalPriceNote.textContent = "Окончательная стоимость определяется на общей странице спецификации.";
