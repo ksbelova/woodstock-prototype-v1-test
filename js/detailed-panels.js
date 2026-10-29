@@ -723,6 +723,7 @@
   }
 
   function priceOverride(id, automaticPercent = 0) {
+    if (isDetailedPanelCalculation()) return automaticPercent;
     const stored = priceAdjustmentOverrides.get(id);
     return Number.isFinite(stored) && stored >= 0 ? stored : automaticPercent;
   }
@@ -753,9 +754,9 @@
     // Для MixMatch оплачиваемая площадь задаётся отдельным фактическим объёмом шпона.
     // Дополнительный процент отхода здесь не применяется, чтобы не задваивать расход.
     if (layoutId === "mixmatch") return 0;
-    // Для полуфабриката +20 фиксированный норматив расхода шпона не подтверждён.
-    // Фактические м² вводит менеджер; исключение — сложные раскладки выше, где подтверждён минимум 100%.
-    if (manufacturingTypeForSize(size) === "allowance20") return null;
+    // В подробном расчёте +20 принят отход 80% от сдаваемой площади.
+    // Сложные раскладки и MixMatch сохраняют отдельные правила.
+    if (manufacturingTypeForSize(size) === "allowance20") return isDetailedPanelCalculation() ? 80 : null;
     if (cleanCuttingRequired(size)) {
       const configured = num(data?.meta?.exactSizeVeneerWastePercent);
       return Number.isFinite(configured) ? configured : 80;
@@ -4086,6 +4087,7 @@
 
   function calculate() {
     if (!data) return null;
+    if (isDetailedPanelCalculation()) priceAdjustmentOverrides.clear();
     capturePositionFinishStateFromDom();
     const warnings = [], breakdown = [], sizes = readSizeRows();
     sizes.forEach((size) => {
@@ -4753,7 +4755,7 @@
         ? (recommendedVeneerAreaM2 / requiredVeneerAreaM2 - 1) * 100
         : null;
       const id = `veneer-actual:${group.key}`;
-      const actualVeneerAreaManual = !fixedMixMatch && priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = !isDetailedPanelCalculation() && !fixedMixMatch && priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
       const actualVeneerAreaM2 = actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
       const complexLayoutMinimumApplies = ["diagonal45", "herringbone"].includes(group.which === "B" ? layoutB : layout) && Number.isFinite(recommendedVeneerAreaM2);
@@ -5090,7 +5092,7 @@
       const sideKey = group.sameAsA ? "A+B" : group.which;
       const consumptionKey = `standard-sheet:${materialIdentity(group.item)}:${sideKey}:${group.length}x${group.width}`;
       const id = `veneer-actual:${consumptionKey}`;
-      const actualVeneerAreaManual = priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = !isDetailedPanelCalculation() && priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
       const actualVeneerAreaM2 = actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
       const valid = Number.isFinite(actualVeneerAreaM2) && actualVeneerAreaM2 > 0 && actualVeneerAreaM2 + 1e-9 >= requiredVeneerAreaM2;
@@ -6567,6 +6569,7 @@
   }
 
   function renderCoefficientAdjustmentControl({ id, name, automaticCoefficient = null, coefficient = null, note = "" }) {
+    if (isDetailedPanelCalculation()) return;
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
@@ -6647,6 +6650,7 @@
   }
 
   function renderAreaAdjustmentControl({ id, name, automaticArea = null, area = null, note = "" }) {
+    if (isDetailedPanelCalculation()) return;
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
@@ -6714,6 +6718,15 @@
 
   function renderVeneerWasteAdjustmentControl(consumption) {
     if (!consumption) return;
+    if (isDetailedPanelCalculation()) {
+      const summary = document.createElement("p");
+      summary.className = "field__note";
+      const area = Number.isFinite(consumption.actualVeneerAreaM2) ? round(consumption.actualVeneerAreaM2, 3) + " м²" : "не определён по имеющимся данным";
+      const waste = Number.isFinite(consumption.actualWastePercent) ? " · отход " + round(consumption.actualWastePercent, 1) + "%" : "";
+      summary.textContent = (consumption.materialName || "Шпон") + " · сторона " + (consumption.sideKey || consumption.which || "—") + ": расход " + area + waste + ". Рассчитывается автоматически.";
+      form.priceAdjustmentsList.append(summary);
+      return;
+    }
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
