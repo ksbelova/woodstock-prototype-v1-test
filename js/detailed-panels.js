@@ -5963,7 +5963,7 @@
     const diagonalValid = invalidDiagonalSizes.length === 0;
     if (!diagonalValid) warnings.push("Для раскладки „Диагональ 45°“ максимальный размер детали — 2800 × 2070 мм.");
     const backMaterialForLayout = form.veneerBModeSelect.value === "other" ? (selectedVeneerB || selectedVeneerBGroup) : selectedVeneerA;
-    const backLayoutAllowed = !isDetailedPanelCalculation() || !sideBNeedsLayout() || isLayoutAllowedForType(layoutB, materialTypeOf(backMaterialForLayout));
+    const backLayoutAllowed = !isDetailedPanelCalculation() || !sideBNeedsLayout() || !layoutB || isLayoutAllowedForType(layoutB, materialTypeOf(backMaterialForLayout));
     const layoutValidation = {
       valid: backLayoutAllowed && (!layoutSelectionRequired || (Boolean(rawLayout) && layoutAllowed)) && layoutDescriptionValid && diagonalValid && mixMatchValid,
       allowedForMaterialType: layoutAllowed,
