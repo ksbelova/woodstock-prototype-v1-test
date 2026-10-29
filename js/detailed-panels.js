@@ -149,6 +149,10 @@
     const base = selectedBase();
     const key = normalizeThicknessKey(currentBaseThicknessRaw());
     if (!base || !key) return null;
+    if (isDetailedPanelCalculation() && size && manufacturingTypeForSize(size) === "standard") {
+      const faceThickness = selectedVeneerThickness();
+      if (!Number.isFinite(faceThickness) || !(Math.abs(faceThickness - 0.6) < 0.001 || faceThickness >= 1.5)) return "production";
+    }
     if (isDetailedPanelCalculation() && base.id === "mdf" && key === "6+6+6") return "production";
     const scenarios = data?.baseThicknessScenarioPriceModes?.[base.id]?.[key];
     if (scenarios && size) {
@@ -894,6 +898,10 @@
     }
     const thickness = selectedVeneerThickness();
     const allowed = veneerThicknessOptionsForSelection(group);
+    if (isDetailedPanelCalculation() && !allowed.length) {
+      setVeneerThicknessError("В справочнике нет подтверждённой толщины этого шпона. Полный расчёт недоступен.");
+      return false;
+    }
     if (!Number.isFinite(thickness)) {
       setVeneerThicknessError(addAttempted ? "Выберите толщину лицевого шпона из справочника." : "");
       return false;
@@ -921,7 +929,7 @@
     const previous = preserve ? selectedVeneerThickness() : null;
     const values = veneerThicknessOptionsForSelection(group);
     const show = Boolean(group && values.length);
-    form.veneerThicknessField.classList.toggle("is-hidden", !show);
+    form.veneerThicknessField.classList.toggle("is-hidden", !show && !(isDetailedPanelCalculation() && group));
     form.veneerSelectionDetailsGrid?.classList.toggle("is-hidden", !group);
     form.veneerThicknessSelect.disabled = !show || values.length === 1;
     form.veneerThicknessSelect.replaceChildren();
@@ -3392,6 +3400,7 @@
   function standardCandidateRows() {
     const base = selectedBase(), t = parseThicknessComposition(currentBaseThicknessRaw());
     if (!base || base.id !== "mdf" || !Number.isFinite(t.total) || t.composite || !selectedVeneerA || !sandingEnabled()) return [];
+    if (isDetailedPanelCalculation() && Math.abs(selectedVeneerThickness() - 0.6) >= 0.001) return [];
     const sides = Number(form.veneeredSidesSelect.value), layout = effectiveLayoutId(), cut = layout === "mixmatch" ? "mixed" : form.veneerCutSelect.value;
     if (!["book", "mixmatch"].includes(layout)) return [];
     if (sides === 1 && form.reverseSideSelect.value !== "rough") return [];
@@ -3898,6 +3907,7 @@
   function standardProductionRateRowFor(thicknessRaw, sides, veneerThickness = selectedVeneerThickness(), baseId = selectedBase()?.id || "mdf") {
     const key = normalizeThicknessKey(thicknessRaw);
     if (isDetailedPanelCalculation() && baseId === "mdf" && key === "6+6+6") return null;
+    if (isDetailedPanelCalculation() && (!Number.isFinite(veneerThickness) || !(Math.abs(veneerThickness - 0.6) < 0.001 || veneerThickness >= 1.5))) return null;
     const thicknessClass = Number.isFinite(veneerThickness) && veneerThickness >= 1.5 ? "1.5+" : "0.6";
     return (data?.standardProductionRates || []).find((item) => (
       item.baseId === baseId &&
@@ -5952,8 +5962,10 @@
       : [];
     const diagonalValid = invalidDiagonalSizes.length === 0;
     if (!diagonalValid) warnings.push("Для раскладки „Диагональ 45°“ максимальный размер детали — 2800 × 2070 мм.");
+    const backMaterialForLayout = form.veneerBModeSelect.value === "other" ? (selectedVeneerB || selectedVeneerBGroup) : selectedVeneerA;
+    const backLayoutAllowed = !isDetailedPanelCalculation() || !sideBNeedsLayout() || isLayoutAllowedForType(layoutB, materialTypeOf(backMaterialForLayout));
     const layoutValidation = {
-      valid: (!layoutSelectionRequired || (Boolean(rawLayout) && layoutAllowed)) && layoutDescriptionValid && diagonalValid && mixMatchValid,
+      valid: backLayoutAllowed && (!layoutSelectionRequired || (Boolean(rawLayout) && layoutAllowed)) && layoutDescriptionValid && diagonalValid && mixMatchValid,
       allowedForMaterialType: layoutAllowed,
       selectedLayoutId: rawLayout,
       descriptionValid: layoutDescriptionValid,
@@ -5961,7 +5973,7 @@
       mixMatchPurchaseArea,
       diagonalValid,
       invalidDiagonalPositions: invalidDiagonalSizes.map((size) => size.position),
-      error: layoutSelectionRequired && rawLayout && !layoutAllowed
+      error: !backLayoutAllowed ? "Выбранная раскладка недоступна для материала стороны Б." : layoutSelectionRequired && rawLayout && !layoutAllowed
         ? "Выбранная раскладка недоступна для мультишпона."
         : layoutSelectionRequired && !rawLayout
         ? "Выберите раскладку шпона."
