@@ -59,7 +59,7 @@
   function decimal(value){const raw=String(value??'').trim().replace(/\s/g,'');return /^\d+(?:[.,]\d{1,2})?$/.test(raw)?Number(raw.replace(',','.')):null;}
   function quoteState(){
     const scope=productionScope(),quote=order.productionQuote;
-    const valid=scope.length>0&&!!quote&&quote.signature===quoteSignature()&&quote.cost>0&&quote.markup>=0&&Number.isSafeInteger(Math.round(quote.cost*100))&&Number.isSafeInteger(Math.round(quote.cost*(1+quote.markup/100)*100));
+    const valid=scope.length>0&&!!quote&&quote.signature===quoteSignature()&&quote.cost>0&&quote.markup>=0&&(productType!=='plate'||quote.markup===50)&&Number.isSafeInteger(Math.round(quote.cost*100))&&Number.isSafeInteger(Math.round(quote.cost*(1+quote.markup/100)*100));
     return {scope,valid,stale:!!quote&&!valid,cost:valid?quote.cost:null,markup:valid?quote.markup:null,clientCost:valid?quote.cost*(1+quote.markup/100):null};
   }
   function renderProduction(){
@@ -601,7 +601,7 @@
     if(order.productionQuote)order.productionQuote.signature='';saveOrder();
   }));
   $('confirmProduction').addEventListener('click',()=>{
-    const cost=decimal($('productionCostInput').value),markup=decimal($('productionMarkupInput').value);
+    const cost=decimal($('productionCostInput').value),markup=productType==='plate'?50:decimal($('productionMarkupInput').value);
     if(!productionScope().length||cost===null||cost<=0||!Number.isSafeInteger(Math.round(cost*100))||markup===null||markup<0||!Number.isSafeInteger(Math.round(cost*(1+markup/100)*100))){$('productionStatus').textContent='Введите положительную себестоимость с точностью до копеек и неотрицательную наценку. Итоговая сумма должна быть корректным денежным значением.';return;}
     order.productionQuote={cost,markup,signature:quoteSignature(),confirmedAt:new Date().toISOString()};saveOrder();render();
   });
@@ -634,7 +634,8 @@
     let changed=false;records.forEach(record=>{if(!record.id){record.id=uid();changed=true;}});if(changed)persist();
     document.querySelectorAll('[data-order]').forEach(node=>{if(order[node.id]!==undefined){if(node.type==='checkbox')node.checked=order[node.id];else node.value=order[node.id];}});
     $('productionCostInput').value=order.productionCostDraft??order.productionQuote?.cost??'';
-    $('productionMarkupInput').value=order.productionMarkupDraft??order.productionQuote?.markup??'50';
+    $('productionMarkupInput').value=productType==='plate'?'50':order.productionMarkupDraft??order.productionQuote?.markup??'50';
+    if(productType==='plate'){$('productionMarkupInput').readOnly=true;$('productionMarkupInput').setAttribute('aria-readonly','true');}
     saveOrder();render();prepareLegacyRecords();
   }catch(error){status('Не удалось открыть спецификацию: '+error.message);$('downloadSpecification').disabled=true;}
 })();
