@@ -496,7 +496,7 @@
       backExplanation.textContent = thin
         ? "Обратная сторона панели закрывается черновым шпоном. Это технический шпон любой породы, на нём допустимы природные особенности древесины. После монтажа его не видно, а нужен он, чтобы панель не повело"
         : thick
-          ? "На обратную сторону клеится более доступный шпон той же толщины, чтобы панель не повело. Он не покрывается лаком и после монтажа не виден"
+          ? "На обратной стороне используется тот же шпон, что и на лицевой стороне, той же толщины. Он нужен как компенсатор, не покрывается лаком и после монтажа не виден"
           : "";
       backExplanation.classList.toggle("is-hidden", !thin && !thick);
     }
@@ -521,23 +521,11 @@
     form.veneerSideBGrid.classList.toggle("is-hidden", !paperAllowed);
     form.veneerBFields.setAttribute("data-quick-hidden", "");
     form.layoutBField?.setAttribute("data-quick-hidden", "");
-    if (two && Math.abs(thickness - 2.5) < 0.001) {
-      const variants = (data?.veneers || []).filter(item => item.type === "natural"
-        && item.group === "ЯСЕНЬ БЕЛЫЙ" && sameConfirmedThickness(itemThickness(item), thickness));
-      const back = bestVeneerVariant(variants);
-      form.veneerBModeSelect.value = "other";
-      selectedVeneerBGroup = back;
-      selectedVeneerB = back;
-      form.veneerBInput.value = back ? veneerDisplayName(back) : "";
-      form.veneerBCutSelect.replaceChildren(new Option(back ? veneerCutLabel(back.veneerCut) : "", back?.veneerCut || ""));
-      form.veneerBCutSelect.value = back?.veneerCut || "";
-      form.veneerBCutField.classList.add("is-hidden");
-    } else {
-      form.veneerBModeSelect.value = "same";
-      selectedVeneerBGroup = null;
-      selectedVeneerB = null;
-      form.veneerBInput.value = "";
-    }
+    // Для 2 и 2,5 мм на сторону Б идёт шпон стороны А.
+    form.veneerBModeSelect.value = "same";
+    selectedVeneerBGroup = null;
+    selectedVeneerB = null;
+    form.veneerBInput.value = "";
     globalFinishSidesManual = false;
     form.finishSidesSelect.value = "1 сторона";
     positionFinishState.forEach((state, rowId) => positionFinishState.set(rowId, { ...state, sides: "1 сторона", sidesManual: false }));
@@ -1169,10 +1157,22 @@
     return /(?:\bAA\b|extra|экстра)/i.test(text);
   }
 
+  // Временное решение команды до подтверждения WOODSTOCK:
+  // при лицевом шпоне 2/2,5 мм стеновой панели сторона Б = та же позиция,
+  // что сторона А, с той же ценой вместо более дешёвого компенсатора.
+  function quickWallUsesFaceVeneerCompensator() {
+    if (!isQuickWallPanel()) return false;
+    const thickness = selectedVeneerThickness();
+    return [2, 2.5].some(value => Math.abs(thickness - value) < 0.001);
+  }
+  function backsideCategoryBRequired(item) {
+    return isFaceOnlyExtraVeneer(item) && !quickWallUsesFaceVeneerCompensator();
+  }
+
   function updateVeneerBModeLabel() {
     const sameOption = form.veneerBModeSelect?.querySelector('option[value="same"]');
     if (!sameOption) return;
-    sameOption.textContent = isFaceOnlyExtraVeneer(selectedVeneerA || selectedVeneerAGroup)
+    sameOption.textContent = backsideCategoryBRequired(selectedVeneerA || selectedVeneerAGroup)
       ? "Та же порода, категория B"
       : "Такой же, как сторона А";
   }
@@ -4279,10 +4279,10 @@
     const faceVeneerBItem = !faceVeneerOnBackRequested
       ? null
       : sameFaceSelectionOnBack
-        ? (isFaceOnlyExtraVeneer(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : selectedVeneerA)
+        ? (backsideCategoryBRequired(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : selectedVeneerA)
         : selectedVeneerB;
 
-    if (sameFaceSelectionOnBack && isFaceOnlyExtraVeneer(selectedVeneerA) && !faceVeneerBItem &&
+    if (sameFaceSelectionOnBack && backsideCategoryBRequired(selectedVeneerA) && !faceVeneerBItem &&
         validSizes.some((size) => classifySize(size).id !== "warehouse_standard")) {
       hasPartialPrice = true;
       warnings.push("Сторона Б: цена категории B выбранной породы и толщины не найдена. Расчёт неполный; требуется подтверждение материала и цены оборота.");
@@ -4725,7 +4725,7 @@
       const pricingMode = row.classificationId === "nonstandard" ? "nonstandard" : "standard";
       const aEligible = row.veneerNetA > 0 && !row.readyShirtA && !(row.classificationId === "standard_request" && row.veneerSheetBasedA);
       const bEligible = row.veneerNetB > 0 && !row.readyShirtB && !(row.classificationId === "standard_request" && row.veneerSheetBasedB);
-      const canCombine = layout === layoutB && aEligible && bEligible && sameFaceSelectionOnBack && !isFaceOnlyExtraVeneer(selectedVeneerA) && sameMaterial(selectedVeneerA, faceVeneerBItem);
+      const canCombine = layout === layoutB && aEligible && bEligible && sameFaceSelectionOnBack && !backsideCategoryBRequired(selectedVeneerA) && sameMaterial(selectedVeneerA, faceVeneerBItem);
 
       if (canCombine) {
         addConsumptionContribution({ item: selectedVeneerA, which: "A", sameAsA: true, pricingMode, row, cleanArea: row.veneerNetA, recommendedArea: row.veneerRecommendedA });
@@ -4832,7 +4832,7 @@
 
     const sameFaceVeneerOnB = (
       sides === 2 && form.veneerBModeSelect.value === "same" && layout === layoutB
-    ) && !isFaceOnlyExtraVeneer(selectedVeneerA);
+    ) && !backsideCategoryBRequired(selectedVeneerA);
     const mixMatchRelevantConsumptions = veneerConsumptions.filter((consumption) => (
       sameMaterial(consumption.item, selectedVeneerA) && ["A", "A+B"].includes(consumption.sideKey)
     ));
@@ -5024,7 +5024,7 @@
       if (!(requiredA > 0 || requiredB > 0)) return;
       const sameVeneerOnB = requiredB > 0 && sides === 2 && form.veneerBModeSelect.value === "same";
 
-      if (sameVeneerOnB && isFaceOnlyExtraVeneer(selectedVeneerA)) {
+      if (sameVeneerOnB && backsideCategoryBRequired(selectedVeneerA)) {
         addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон стороны А${contextLabel}`, false, pricingMode);
         const backB = backsideBVariantFor(selectedVeneerA);
         if (backB) addVeneerComponent(backB, requiredB, "B", `Шпон стороны Б (категория B)${contextLabel}`, false, pricingMode);
@@ -5062,7 +5062,7 @@
         layout === layoutB && item.veneerSheetBasedA &&
         item.veneerSheetBasedB &&
         sameFaceSelectionOnBack &&
-        !isFaceOnlyExtraVeneer(selectedVeneerA) &&
+        !backsideCategoryBRequired(selectedVeneerA) &&
         selectedVeneerA && faceVeneerBItem &&
         (selectedVeneerA.id ? selectedVeneerA.id === faceVeneerBItem.id : veneerDisplayName(selectedVeneerA) === veneerDisplayName(faceVeneerBItem))
       );
@@ -5084,7 +5084,7 @@
       if (item.veneerSheetBasedB && faceVeneerBItem) {
         addStandardSheetGroupRow({
           item: faceVeneerBItem, which: "B", surfaceCount: 1,
-          label: isFaceOnlyExtraVeneer(selectedVeneerA)
+          label: backsideCategoryBRequired(selectedVeneerA)
             ? "Шпон стороны Б (категория B) · стандарт по запросу"
             : "Шпон стороны Б · стандарт по запросу",
           row: item
@@ -6046,13 +6046,6 @@
         warnings.push(`Позиция ${item.position}: ${message}. Размеры сохранены для проверки; наличие цены производства само по себе не подтверждает формат.`);
       });
     }
-    const pendingQuickRules = [];
-    if (isQuickWallPanel() && Math.abs(veneerThickness - 2) < 0.001) pendingQuickRules.push("Лицевой слой 2 мм: материал и цена оборота не согласованы; показанная стоимость предварительная.");
-    if (pendingQuickRules.length) {
-      hasPartialPrice = true;
-      requiresProductionCost = true;
-      pendingQuickRules.forEach(message => { warnings.push(message); itemResults.forEach(item => markPositionPending(item, message)); });
-    }
     let priceCalculationComplete = Boolean(
       base &&
       Number.isFinite(thickness.total) &&
@@ -6071,7 +6064,7 @@
       itemResults.forEach(item => {
         if (manufacturingCostFromProduction(item)) markPositionPending(item, "Стоимость производства");
         if (thickVeneerWorkAdjustment.applies && isExactFinishedDetail(item) && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) markPositionPending(item, "Работа с толстым шпоном");
-        if (sameFaceSelectionOnBack && isFaceOnlyExtraVeneer(selectedVeneerA) && !faceVeneerBItem && item.classificationId !== "warehouse_standard") markPositionPending(item, "Шпон оборотной стороны");
+        if (sameFaceSelectionOnBack && backsideCategoryBRequired(selectedVeneerA) && !faceVeneerBItem && item.classificationId !== "warehouse_standard") markPositionPending(item, "Шпон оборотной стороны");
         if (calibrationEnabled && !["calculated", "included_in_panel_price", "not_required"].includes(calibrationPricingStatus)) markPositionPending(item, "Калибровка: стоимость уточняет производство");
         const finish = finishResults.find(entry => entry.rowId === item.rowId);
         if (finish && (finish.totalFinishCost === null || finish.requiresProductionCost || [finish.toningPricingStatus,finish.isolatorPricingStatus].some(status => /pending|incomplete/.test(status || "")))) markPositionPending(item, "Финишное покрытие");
@@ -6406,7 +6399,7 @@
       : (form.reverseSideSelect.options[form.reverseSideSelect.selectedIndex]?.text || "—");
     const sideBSelectedMaterial = sides === 2
       ? (sideBSelectionMode === "same"
-        ? (isFaceOnlyExtraVeneer(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : veneerA)
+        ? (backsideCategoryBRequired(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : veneerA)
         : sideBSelectionMode === "other" ? (selectedVeneerB || selectedVeneerBGroup) : null)
       : null;
     const sideBThickness = sideBSelectionMode === "rough"
@@ -8394,7 +8387,7 @@
     }
     const sideBMaterialForSave = sides === 2
       ? (sideBSelectionModeForSave === "same"
-        ? (isFaceOnlyExtraVeneer(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : sideAMaterialForSave)
+        ? (backsideCategoryBRequired(selectedVeneerA) ? backsideBVariantFor(selectedVeneerA) : sideAMaterialForSave)
         : sideBSelectionModeForSave === "other" ? sideBOtherMaterialForSave : null)
       : null;
     const sideBMaterialCostForSave = sideBVeneerMaterialCost(lastCalculation, sideBSelectionModeForSave);
@@ -8485,7 +8478,7 @@
       veneerA: readyShirtSelected ? "" : veneerDisplayName(selectedVeneerA || selectedVeneerAGroup),
       veneerThickness: readyShirtSelected ? null : selectedVeneerThickness(),
       veneerAPriceLevel: readyShirtSelected ? "" : (lastCalculation.veneerPricings.find((x) => x.which === "A")?.levelName || ""),
-      sides, sideB: sides === 1 ? (form.reverseSideSelect.options[form.reverseSideSelect.selectedIndex]?.text || "") : (sideBSelectionModeForSave === "same" ? (isFaceOnlyExtraVeneer(selectedVeneerA) ? "Категория B той же породы (автоматически)" : veneerDisplayName(selectedVeneerA || selectedVeneerAGroup)) : sideBSelectionModeForSave === "rough" ? "Черновой шпон" : veneerDisplayName(selectedVeneerB || selectedVeneerBGroup)), veneerBPriceLevel: lastCalculation.veneerPricings.find((x) => x.which === "B")?.levelName || "",
+      sides, sideB: sides === 1 ? (form.reverseSideSelect.options[form.reverseSideSelect.selectedIndex]?.text || "") : (sideBSelectionModeForSave === "same" ? (backsideCategoryBRequired(selectedVeneerA) ? "Категория B той же породы (автоматически)" : veneerDisplayName(selectedVeneerA || selectedVeneerAGroup)) : sideBSelectionModeForSave === "rough" ? "Черновой шпон" : veneerDisplayName(selectedVeneerB || selectedVeneerBGroup)), veneerBPriceLevel: lastCalculation.veneerPricings.find((x) => x.which === "B")?.levelName || "",
       layout: needsLayoutSelection() ? (selectedLayout()?.name || "") : "",
       layoutId: needsLayoutSelection() ? (form.layoutSelect.value || "") : "",
       layoutAId: effectiveLayoutId(),

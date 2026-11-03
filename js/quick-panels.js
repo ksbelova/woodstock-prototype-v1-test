@@ -81,7 +81,7 @@
    const thickness=Number(form.veneerThicknessSelect.value);
    const two=Number(form.veneeredSidesSelect.value)===2;
    $('quickReverseSide').textContent=!form.veneerThicknessSelect.value?'—':two
-    ? (Math.abs(thickness-2.5)<0.001?'шпон ясеня 2,5 мм':'шпон той же породы, 2 мм')
+    ? 'тот же шпон, что и на стороне А'
     : form.reverseSideSelect.value==='paper'?'бумага':'черновой шпон';
   }
   const certified=wall&&result?.base?.id==='gsp';
