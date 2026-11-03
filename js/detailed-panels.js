@@ -844,9 +844,22 @@
     return twoSidedRoughBackSelected() ? selectedRoughBackThickness() : selectedVeneerThickness();
   }
 
+  // Временное решение команды: 1 мм чернового шпона оцениваем по большей
+  // ставке для 1,5 мм — 440 руб./м². Толщину материала при этом НЕ меняем.
+  // Подтвердить тариф и возможную отдельную производственную доплату у WOODSTOCK.
+  const QUICK_ROUGH_BACK_ONE_MM_TEMPORARY_RATE_PER_M2 = 440;
+  function quickRoughBackOneMmTemporaryRateApplies() {
+    return document.body.classList.contains("quick-panels-page") &&
+      Number(form.veneeredSidesSelect?.value) === 1 &&
+      form.reverseSideSelect?.value === "rough" &&
+      Math.abs(selectedVeneerThickness() - 1) < 0.001;
+  }
   function roughBackRateForThickness(value) {
     const thickness = num(value);
     if (!Number.isFinite(thickness)) return null;
+    if (Math.abs(thickness - 1) < 0.001 && quickRoughBackOneMmTemporaryRateApplies()) {
+      return QUICK_ROUGH_BACK_ONE_MM_TEMPORARY_RATE_PER_M2;
+    }
     const entry = Object.entries(roughBackRates()).find(([key]) => {
       const keyThickness = num(key);
       return Number.isFinite(keyThickness) && Math.abs(keyThickness - thickness) < 0.001;
@@ -4629,7 +4642,7 @@
           roughBackCostTotal += rough;
           roughBackPricingStatus = "calculated";
           retailCost += rough; finalCost += rough;
-          breakdown.push({ label: "Черновой шпон стороны Б", value: rough, note: `${money(roughRate)}/м² для подтверждённой толщины чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
+          breakdown.push({ label: "Черновой шпон стороны Б", value: rough, note: `${money(roughRate)}/м² для чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
         } else {
           roughBackPricingStatus = "requires_clarification";
           (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
@@ -6223,7 +6236,7 @@
       ratePerM2: Number.isFinite(roughBackRatePerM2) ? roughBackRatePerM2 : null,
       materialCost: roughBackPricingStatus === "calculated" ? roughBackCostTotal : null,
       pricingStatus: roughBackPricingStatus === "not_required" ? "requires_clarification" : roughBackPricingStatus,
-      source: "meta.roughBackVeneerRatesPerM2ByThickness"
+      source: quickRoughBackOneMmTemporaryRateApplies() ? "temporary_team_rate_1mm_as_1_5mm_440_rub_m2" : "meta.roughBackVeneerRatesPerM2ByThickness"
     } : null;
     return { base, thickness, sizes, validSizes, itemResults, productionCosts, totalArea, totalProductionArea, totalPieces, retailTotal, retailAvgM2: totalArea > 0 ? retailTotal / totalArea : null, automaticFinalTotal, finalTotal, manualDiscountPercent, manualDiscountCandidateTotal, manualDiscountApplied, vat, avgM2: totalArea > 0 ? finalTotal / totalArea : null, avgPiece: totalPieces > 0 ? finalTotal / totalPieces : null, totalWeight, warnings: [...new Set(warnings)], breakdown, hasPartialPrice, priceCalculationComplete, allStandard, attachedEdgeMeters, edge, edgeComment, orderLevelUnallocatedCost, positionPricingReconciled, mdfVolumeId, herringbone, customLayout, veneerPricings, readyShirtPricings, mdfPricings, baseRatePricings, veneerWasteAdjustments, veneerConsumptions, standardFinalSubtotal, standardRequestFinalSubtotal, nonstandardFinalSubtotal, roughBackVeneer, techOperations, finishResults, requiresBaseProductionCost, requiresLayoutProductionCost, requiresAllowanceProductionCost, requiresReadyShirtProductionCost, requiresFinishProductionCost, requiresOperationProductionCost, requiresProductionCost, thickVeneerWorkAdjustment, mixMatchVeneerPricing, layoutValidation, sizeValidation };
   }

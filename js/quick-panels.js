@@ -123,6 +123,14 @@
     const selected=Boolean(form.veneerThicknessSelect.value)&&[2,2.5].some(value=>Math.abs(faceThickness-value)<0.001);
     compensatorNote.classList.toggle('is-hidden',!selected);
   }
+  const roughOneMmNote=$('quickRoughOneMmReviewNote');
+  if(roughOneMmNote){
+    const roughSelected=Boolean(form.veneerThicknessSelect.value)
+      &&Math.abs(faceThickness-1)<0.001
+      &&Number(form.veneeredSidesSelect.value)===1
+      &&form.reverseSideSelect.value==='rough';
+    roughOneMmNote.classList.toggle('is-hidden',!roughSelected);
+  }
   const paperEdgeNote=$('quickPaperEdgeReviewNote');
   if(paperEdgeNote){
     const paperEdgeSelected=form.reverseSideSelect.value==='paper'
