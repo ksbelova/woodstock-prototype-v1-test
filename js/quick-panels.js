@@ -179,12 +179,20 @@
    const width=result?.edge?.widthMm;
    $('quickEdgeWidth').textContent=result?.edge?.mode===(standard?'separate':'attached')&&Number.isFinite(width)&&width>0?number(width)+' мм':'—';
   }
+  const sourceList=document.querySelector('.spec-panel .spec-list');
+  if(sourceList){
+   let sourceRow=$('quickEdgePriceSourceRow');
+   if(!sourceRow){sourceRow=document.createElement('div');sourceRow.id='quickEdgePriceSourceRow';const label=document.createElement('dt');label.textContent='Цена кромки';const value=document.createElement('dd');value.id='quickEdgePriceSource';sourceRow.append(label,value);sourceList.append(sourceRow);}
+   const source=result?.edge?.mode!=='none'?result?.edge?.priceCatalogSource:'';
+   sourceRow.classList.toggle('is-hidden',!source);$('quickEdgePriceSource').textContent=source||'';
+  }
+
  }
  function productDocument(record,result){
   const side=(material,pattern)=>material?[`${material.name||'—'} · ${number(material.thicknessMm)} мм`,pattern].filter(Boolean).join(' · '):record.sideB||'—';
   const edge=record.edge||{};
   const certified=wall&&record.baseId==='gsp';
-  const edgeText=certified?'По сертификату КМ1 (уточняет производство)':edge.mode==='none'?'Не нужна':[edge.typeName,edge.veneerName||edge.name,edge.thicknessApplicable?number(edge.thicknessMm)+' мм':'',number(edge.widthMm)+' мм',number(edge.meters??edge.orderedMeters)+' пог. м'].filter(Boolean).join(' · ');
+  const edgeText=certified?'По сертификату КМ1 (уточняет производство)':edge.mode==='none'?'Не нужна':[edge.typeName,edge.veneerName||edge.name,edge.thicknessApplicable?number(edge.thicknessMm)+' мм':'',number(edge.widthMm)+' мм',number(edge.meters??edge.orderedMeters)+' пог. м',edge.priceCatalogSource].filter(Boolean).join(' · ');
   const edgeForPosition=row=>{
    if(edge.mode==='none')return 'Не нужна';
    if(edge.mode==='separate')return 'Отдельная спецификация';

@@ -141,7 +141,7 @@
   }
   function edgeRows(){return records.flatMap((record,index)=>{
     const edge=effectiveEdge(record);if(!edge||edge.mode==='none')return [];
-    const base=[String(index+1),join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment]),n(edge.widthMm)+' / '+(edge.thicknessApplicable?n(edge.thicknessMm):'—')];
+    const base=[String(index+1),join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,edge.priceCatalogSource]),n(edge.widthMm)+' / '+(edge.thicknessApplicable?n(edge.thicknessMm):'—')];
     const rows=[];
     if(edge.mode==='attached'){
       (edge.positionSettings||[]).filter(item=>item.applies).forEach(item=>rows.push([(index+1)+'.'+item.position,base[1],n(item.widthMm??edge.widthMm)+' / '+n(item.thicknessMm??edge.thicknessMm),item.sides,n(item.geometricMeters),n(item.calculatedMeters),money(item.pricePerRunningM??edge.pricePerRunningM),'В составе итога ниже','В составе итога ниже']));

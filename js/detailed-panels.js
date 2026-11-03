@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const DATA_URL = "../../data/panels.json?v=20261017-remove-ready-shirts";
+  const DATA_URL = "../../data/panels.json?v=20261103-ordered-edge";
   const Core = window.WoodstockPanelsCore;
   // Общая спецификация: инженерная доска уже сохраняется в этот же ключ.
   const SPEC_STORAGE_KEY = "woodstockDetailedSpecification";
@@ -266,9 +266,9 @@
     }, 0);
   }
 
-  function applicableEdgeVolumeLevels(orderRunningM) {
+  function applicableEdgeVolumeLevels(orderRunningM, levels = data?.edgePriceLevels) {
     if (!Number.isFinite(orderRunningM) || orderRunningM <= 0) return [];
-    return (data?.edgePriceLevels || []).filter((level) => {
+    return (levels || []).filter((level) => {
       if (level?.scope !== "order_volume") return false;
       const min = num(level.minRunningM);
       const max = num(level.maxRunningM);
@@ -278,7 +278,7 @@
     });
   }
 
-  function automaticEdgePrice(priceRow, clientConditionId, orderRunningM) {
+  function automaticEdgePrice(priceRow, clientConditionId, orderRunningM, levels = data?.edgePriceLevels) {
     if (!priceRow || typeof priceRow !== "object") return null;
     const retail = num(priceRow.retail);
     const requestedConditionId = clientConditionId || "retail";
@@ -293,7 +293,7 @@
       volumePricingDeferred: !window.WoodstockPanelsView?.edgeVolumePricing
     };
     if (!window.WoodstockPanelsView?.edgeVolumePricing || !Number.isFinite(clientPrice)) return base;
-    const candidates = applicableEdgeVolumeLevels(orderRunningM)
+    const candidates = applicableEdgeVolumeLevels(orderRunningM, levels)
       .map(level => ({ level, price: num(priceRow[level.priceKey || level.id]) }))
       .filter(candidate => Number.isFinite(candidate.price) && candidate.price < base.price)
       .sort((a, b) => a.price - b.price);
@@ -1375,10 +1375,16 @@
 
   function findEdgeNameGroup(typeId, value) {
     if (!typeId || !String(value || "").trim()) return null;
-    return edgeNameGroups(typeId)
-      .map((item) => ({ item, score: edgeGroupMatchScore(item.displayName, value) }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score || b.item.displayName.length - a.item.displayName.length)[0]?.item || null;
+    // Preserve existing stock-family matching; order materials require exact names.
+    const groups = edgeNameGroups(typeId);
+    const stock = groups.filter(item => item.stockProgram)
+      .map(item => ({item, score: edgeGroupMatchScore(item.displayName, value)}))
+      .filter(entry => entry.score > 0)
+      .sort((a,b) => b.score-a.score || b.item.displayName.length-a.item.displayName.length)[0]?.item;
+    if (stock) return stock;
+    const matches = groups.filter(item => !item.stockProgram && [item.displayName,...(item.aliases || [])]
+      .some(name => normalizeEdgeLookup(name) === normalizeEdgeLookup(value)));
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function edgeTypeById(typeId) {
@@ -1421,7 +1427,31 @@
   }
 
   function edgeCatalogItems(typeId = "") {
-    return (data?.edgeCatalog || []).filter((item) => !typeId || item.typeId === typeId);
+    return [...(data?.edgeCatalog || []),...(data?.orderedEdgeCatalog || [])].filter(item => !typeId || item.typeId === typeId);
+  }
+
+  function edgeCatalogWidths(item) {
+    if (!item?.orderedProgram) return item?.availableWidths || [];
+    const min=Math.ceil(Number(item.widthRangeMm?.min)), max=Math.floor(Number(item.widthRangeMm?.max));
+    return Number.isFinite(min) && Number.isFinite(max) && min>0 && max>=min
+      ? Array.from({length:max-min+1},(_,i)=>min+i) : [];
+  }
+
+  function edgeCatalogPriceRow(item,width) {
+    if (!item || !edgeCatalogWidths(item).includes(Number(width))) return null;
+    if (!item.orderedProgram) return item.pricesPerRunningM?.[String(width)] || null;
+    return Object.fromEntries(Object.entries(item.pricesPerM2 || {}).map(([key,price])=>
+      [key,Number.isFinite(price) && price>0 ? price*width/1000 : null]));
+  }
+
+  function edgeWidthPeers(item) {
+    return item ? edgeCatalogItems(item.typeId).filter(other =>
+      normalizeEdgeLookup(other.veneerName || other.displayName) === normalizeEdgeLookup(item.veneerName || item.displayName) &&
+      Number(other.thicknessMm) === Number(item.thicknessMm)) : [];
+  }
+
+  function edgeAvailableWidths(item) {
+    return [...new Set(edgeWidthPeers(item).flatMap(edgeCatalogWidths))].sort((a,b)=>a-b);
   }
 
   function edgeNameGroups(typeId) {
@@ -1434,6 +1464,8 @@
         id: `edge_name:${typeId}:${key}`,
         displayName: label,
         veneerName: item.veneerName || label,
+        stockProgram: !item.orderedProgram,
+        aliases: item.aliases || [],
         typeId
       });
     });
@@ -1483,12 +1515,15 @@
       normalizeEdgeLookup(item.veneerName || item.displayName) === normalizeEdgeLookup(group.displayName));
     const boundId = controls.materialInput?.dataset?.catalogItemId || "";
     const bound = boundId ? candidates.find((item) => item.id === boundId) : null;
-    if (type.thicknessMode === "none") return bound || candidates[0] || null;
+    const requestedWidth = Object.prototype.hasOwnProperty.call(options,"widthMm") ? num(options.widthMm) : num(controls.widthSelect.value);
+    const byWidth = list => list.find(item => !item.orderedProgram && edgeCatalogWidths(item).includes(requestedWidth))
+      || list.find(item => item.orderedProgram && edgeCatalogWidths(item).includes(requestedWidth))
+      || list.find(item => !item.orderedProgram) || list[0] || null;
+    if (type.thicknessMode === "none") return byWidth(candidates);
     const hasOverride = Object.prototype.hasOwnProperty.call(options, "thicknessMm");
     const thickness = hasOverride ? num(options.thicknessMm) : currentEdgeThickness(which);
     if (!Number.isFinite(thickness)) return null;
-    if (bound && Number.isFinite(num(bound.thicknessMm)) && Math.abs(num(bound.thicknessMm) - thickness) < 0.001) return bound;
-    return candidates.find((item) => Number.isFinite(num(item.thicknessMm)) && Math.abs(num(item.thicknessMm) - thickness) < 0.001) || null;
+    return byWidth(candidates.filter(item => Number.isFinite(num(item.thicknessMm)) && Math.abs(num(item.thicknessMm)-thickness)<0.001));
   }
 
   function syncEdgeThicknessOptions(which = "attached", { preserve = true } = {}) {
@@ -1606,13 +1641,15 @@
 
     controls.materialInput.dataset.catalogItemId = item.id;
     controls.widthSelect.add(new Option("Выберите ширину кромки", ""));
-    const widths = (item.availableWidths || []).filter((width) => edgeWidthFitsProduct(width)).sort((a, b) => a - b);
+    const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
     widths.forEach((width) => controls.widthSelect.add(new Option(`${width} мм`, String(width))));
     controls.widthSelect.disabled = false;
     if (!edgeWidthAutomatic[which] && Number.isFinite(previous) && widths.includes(previous)) {
       controls.widthSelect.value = String(previous);
     } else if (widths.length) {
-      controls.widthSelect.value = String(widths[0]);
+      // New order widths do not change an existing automatic stock choice.
+      const stockWidths=edgeWidthPeers(item).filter(other=>!other.orderedProgram).flatMap(edgeCatalogWidths).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
+      controls.widthSelect.value = String(stockWidths[0] || widths[0]);
       edgeWidthAutomatic[which] = true;
     }
   }
@@ -1681,7 +1718,7 @@
     const group = edgeNameGroupForInput(which);
     const hasThicknessOverride = Object.prototype.hasOwnProperty.call(options, "thicknessMm");
     const thickness = hasThicknessOverride ? num(options.thicknessMm) : currentEdgeThickness(which);
-    const item = resolveEdgeCatalogItem(which, { thicknessMm: thickness });
+    const item = resolveEdgeCatalogItem(which, {thicknessMm:thickness,...(Object.prototype.hasOwnProperty.call(options,"widthMm")?{widthMm:options.widthMm}:{})});
     const thicknessRequired = Boolean(type && (type.thicknessMode !== "none" || isQuickWallPanel() && which === "attached"));
     const customOrder = Boolean(type && rawName && (!group || (group && thicknessRequired && Number.isFinite(thickness) && !item)));
     const selectedStockWidth = Object.prototype.hasOwnProperty.call(options, "widthMm") ? num(options.widthMm) : num(controls.widthSelect.value);
@@ -1691,21 +1728,24 @@
       : customOrder
         ? (Number.isFinite(requestedOrderWidth) ? requestedOrderWidth : selectedStockWidth)
         : null;
-    const stockProgram = Boolean(item && Number.isFinite(width) && (item.availableWidths || []).some((value) => Number(value) === width));
+    const catalogPriced = Boolean(item && Number.isFinite(width) && edgeCatalogWidths(item).includes(width));
+    const stockProgram = Boolean(catalogPriced && !item.orderedProgram);
+    const orderedProgram = Boolean(catalogPriced && item.orderedProgram);
     const selectedClientConditionId = form.clientConditionSelect.value || "retail";
-    const priceRow = stockProgram ? item?.pricesPerRunningM?.[String(width)] : null;
+    const priceRow = catalogPriced ? edgeCatalogPriceRow(item,width) : null;
     const orderRunningM = Number.isFinite(num(options.orderRunningM)) ? num(options.orderRunningM) : null;
-    const automaticPrice = stockProgram ? automaticEdgePrice(priceRow, selectedClientConditionId, orderRunningM) : null;
+    const priceLevels = item?.orderedProgram ? data.orderedEdgePriceLevels : data.edgePriceLevels;
+    const automaticPrice = catalogPriced ? automaticEdgePrice(priceRow,selectedClientConditionId,orderRunningM,priceLevels) : null;
     const manualOrderPricePerM2 = !isDetailedPanelCalculation() && customOrder ? num(controls.orderPriceInput?.value) : null;
     const manualOrderPricePerRunningM = customOrder && Number.isFinite(manualOrderPricePerM2) && Number.isFinite(width)
       ? manualOrderPricePerM2 * width / 1000
       : null;
     const conditionId = customOrder ? "manual_order_price" : (automaticPrice?.id || selectedClientConditionId || "retail");
-    const conditionName = customOrder ? "Цена заказной кромки по согласованию" : (automaticPrice?.name || clientConditionUiName(selectedClientConditionId));
+    const conditionName = customOrder ? "Цена заказной кромки по согласованию" : [automaticPrice?.name || clientConditionUiName(selectedClientConditionId),item?.source].filter(Boolean).join(" · ");
     const conditionSource = customOrder ? "manual_order_price" : (automaticPrice?.source || "missing_price");
     const pricePerRunningM = customOrder ? manualOrderPricePerRunningM : num(automaticPrice?.price);
     const retailPricePerRunningM = customOrder ? manualOrderPricePerRunningM : num(priceRow?.retail);
-    const volumePriceLevels = stockProgram ? {
+    const volumePriceLevels = catalogPriced ? {
       volume1000_2999: Number.isFinite(num(priceRow?.volume1000_2999)) ? num(priceRow.volume1000_2999) : null,
       volume2999_4999: Number.isFinite(num(priceRow?.volume2999_4999)) ? num(priceRow.volume2999_4999) : null,
       volume5000_plus: Number.isFinite(num(priceRow?.volume5000_plus)) ? num(priceRow.volume5000_plus) : null
@@ -1725,6 +1765,7 @@
     else if (!Number.isFinite(width) || width <= 0) validationError = "Выберите или укажите ширину кромки.";
 
     if (!validationError && customOrder && Number.isFinite(manualOrderPricePerM2) && manualOrderPricePerM2 < 0) validationError = "Цена заказной кромки не может быть отрицательной.";
+    if (!validationError && item?.orderedProgram && !catalogPriced) validationError = `Ширина заказной кромки должна быть от ${item.widthRangeMm.min} до ${item.widthRangeMm.max} мм.`;
     if (!validationError && isDetailedPanelCalculation() && which === "attached" && !Number.isFinite(detailedFinishedThicknessMm())) validationError = "Итоговая толщина изделия не определена: нужны подтверждённые толщины облицовки обеих сторон.";
     if (!validationError && (which === "attached" || isQuickStandardPanel() && which === "separate") && Number.isFinite(width) && !edgeWidthFitsProduct(width)) validationError = Number.isFinite(quickPanelFinishedThicknessMm())
       ? "Ширина кромки должна быть больше итоговой толщины изделия минимум на 4 мм."
@@ -1744,6 +1785,10 @@
       hasFleece: item?.hasFleece ?? type?.hasFleece ?? null,
       catalogItem: item,
       catalogItemId: item?.id || null,
+      priceCatalogSource: item?.source || null,
+      priceCatalogUrl: item?.sourceUrl || null,
+      priceCatalogCell: item?.sourceCell || null,
+      orderedProgram,
       stockProgram,
       orderPosition: Boolean(customOrder || (rawName && !stockProgram)),
       customOrder,
@@ -1756,9 +1801,9 @@
       pricePerRunningM: Number.isFinite(pricePerRunningM) ? pricePerRunningM : null,
       manualOrderPricePerM2: Number.isFinite(manualOrderPricePerM2) ? manualOrderPricePerM2 : null,
       conditionUnresolved: Boolean(automaticPrice?.conditionUnresolved),
-      volumePricingDeferred: Boolean(stockProgram && automaticPrice?.volumePricingDeferred),
+      volumePricingDeferred: Boolean(catalogPriced && automaticPrice?.volumePricingDeferred),
       volumePriceLevels,
-      volumePriceRanges: stockProgram ? (data.edgePriceLevels || []).filter(level => level.scope === "order_volume").map(level => ({ ...level })) : null,
+      volumePriceRanges: catalogPriced ? (priceLevels || []).filter(level => level.scope === "order_volume").map(level => ({ ...level })) : null,
       operationRateClass,
       valid: !validationError,
       validationError
@@ -3858,7 +3903,7 @@
 
   function positionEdgeWidthControl(state) {
     const item = resolveEdgeCatalogItem("attached", { thicknessMm: state.thicknessMm });
-    const widths = (item?.availableWidths || []).filter((width) => edgeWidthFitsProduct(width));
+    const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct);
     return item
       ? `<select data-position-edge-width><option value="">Выберите ширину</option>${widths.map((width) => `<option value="${esc(width)}"${Number(state.widthMm) === Number(width) ? " selected" : ""}>${width} мм</option>`).join("")}</select>`
       : `<input data-position-edge-width type="number" min="1" value="${esc(state.widthMm || "")}" />`;
@@ -5616,6 +5661,9 @@
           edge.stockProgram = positionSettings.filter((item) => item.applies).every((item) => item.selection?.stockProgram);
           edge.orderPosition = positionSettings.filter((item) => item.applies).some((item) => item.selection?.orderPosition);
           const appliedSelections = positionSettings.filter((item) => item.applies && item.selection).map((item) => item.selection);
+          const catalogSources = [...new Set(appliedSelections.map(selection=>selection.priceCatalogSource).filter(Boolean))];
+          edge.priceCatalogSource = catalogSources.length===1 ? catalogSources[0] : catalogSources.length ? "Разные прайсы — см. позиции кромки" : null;
+          edge.orderedProgram = appliedSelections.some(selection=>selection.orderedProgram);
           const conditionIds = new Set(appliedSelections.map((selection) => selection.conditionId || "retail"));
           const conditionNames = new Set(appliedSelections.map((selection) => selection.conditionName || "Розничная цена"));
           const conditionSources = new Set(appliedSelections.map((selection) => selection.conditionSource || "retail"));
@@ -6473,6 +6521,7 @@
       characteristics.push(specRow("Кромка", "Нет"));
     } else {
       characteristics.push(specRow("Кромка", edge.displayName || edge.name || edge.typeName || "Да"));
+      if(edge.priceCatalogSource) characteristics.push(specRow("Источник цены кромки",edge.priceCatalogSource,1));
       if (edge.thicknessApplicable && Number.isFinite(edge.thicknessMm)) characteristics.push(specRow("Толщина кромки", `${specNumber(edge.thicknessMm, 2)} мм`, 1));
       if (Number.isFinite(edge.widthMm)) characteristics.push(specRow("Ширина кромки", `${specNumber(edge.widthMm, 2)} мм`, 1));
       if (edge.mode === "attached") {
@@ -8669,6 +8718,10 @@
             thicknessMm: Number.isFinite(item.thicknessMm) ? item.thicknessMm : null,
             widthMm: item.selection?.widthMm ?? null,
             catalogItemId: item.selection?.catalogItemId || null,
+            priceCatalogSource: item.selection?.priceCatalogSource || null,
+            priceCatalogUrl: item.selection?.priceCatalogUrl || null,
+            priceCatalogCell: item.selection?.priceCatalogCell || null,
+            orderedProgram: Boolean(item.selection?.orderedProgram),
             stockProgram: Boolean(item.selection?.stockProgram),
             orderPosition: Boolean(item.selection?.orderPosition),
             priceConditionId: item.selection?.conditionId || "retail",
@@ -8704,6 +8757,10 @@
         operationRequiresProductionCost: lastCalculation.edge.operationRequiresProductionCost === true,
         materialPricingStatus: lastCalculation.edge.materialPricingStatus || "pending",
         stockProgram: Boolean(lastCalculation.edge.stockProgram),
+        priceCatalogSource: lastCalculation.edge.priceCatalogSource || null,
+        priceCatalogUrl: lastCalculation.edge.priceCatalogUrl || null,
+        priceCatalogCell: lastCalculation.edge.priceCatalogCell || null,
+        orderedProgram: Boolean(lastCalculation.edge.orderedProgram),
         orderPosition: Boolean(lastCalculation.edge.orderPosition),
         volumePriceLevels: lastCalculation.edge.volumePriceLevels || null,
         volumePriceRanges: lastCalculation.edge.volumePriceRanges || null
