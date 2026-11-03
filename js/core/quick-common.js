@@ -507,7 +507,7 @@ function createPdfDocument(payload,product){
  {text:product.title,style:"sectionTitle"},
  {table:{headerRows:1,widths:fitPdfTableWidths(product.widths,1.4),body:[product.header,...product.rows],dontBreakRows:product.dontBreakRows??true},layout:{...pdfTableLayout(),paddingLeft:()=>1.4,paddingRight:()=>1.4,fillColor:row=>row===0?"#F0F0ED":null},margin:[0,0,0,product.tableBottomMargin??10]},
  ...(product.beforePrice||[]),
-      { text: payload.pricing.partial ? "Стоимость рассчитанной части" : "Ориентировочная стоимость", style: "sectionTitle", alignment: "right" },
+      { text: product.preliminaryPriceLabels ? "Ориентировочная стоимость" : (payload.pricing.partial ? "Стоимость рассчитанной части" : "Ориентировочная стоимость"), style: "sectionTitle", alignment: "right" },
       {
         stack: [
           { text: "Расчётная цена за м² с НДС", style: "priceLabel", alignment: "right" },
@@ -525,7 +525,7 @@ function createPdfDocument(payload,product){
             alignment: "right",
             margin: [0, 0, 0, 6]
           },
-          { text: payload.pricing.partial ? "Рассчитанная часть с НДС" : "Итого с НДС", style: "priceLabel", alignment: "right" },
+          { text: product.preliminaryPriceLabels ? "Ориентировочная стоимость с НДС" : (payload.pricing.partial ? "Рассчитанная часть с НДС" : "Итого с НДС"), style: "priceLabel", alignment: "right" },
           { text: total, style: "totalValue", alignment: "right", margin: [0, 3, 0, 5] },
           {
             canvas: [{

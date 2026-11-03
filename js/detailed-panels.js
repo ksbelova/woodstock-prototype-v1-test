@@ -5574,12 +5574,12 @@
             }
 
             const productionOperation = manufacturingCostFromProduction(validSizes.find((size) => size.rowId === item.rowId));
-            const groupEdgeMeters = (isDetailedPanelCalculation() ? edge.geometricMeters : attachedEdgeMeters) + existingSpecificationItems().filter(record =>
+            const groupEdgeMeters = edge.geometricMeters + existingSpecificationItems().filter(record =>
               window.WoodstockSpecificationGroupId && (record.calculationGroupId || record.id) === window.WoodstockSpecificationGroupId && record.edge?.mode === "attached"
-            ).reduce((sum, record) => sum + (Number(isDetailedPanelCalculation() ? record.edge.geometricMeters : record.edge.calculatedMeters) || 0), 0);
+            ).reduce((sum, record) => sum + (Number(record.edge.geometricMeters) || 0), 0);
             const rateInfo = productionOperation ? null : attachedEdgeRateFor(thickness.raw, selection, groupEdgeMeters, base?.id);
             if (rateInfo && Number.isFinite(rateInfo.rate)) {
-              const operationMeters = isDetailedPanelCalculation() ? item.geometricMeters : meters;
+              const operationMeters = item.geometricMeters;
               const operationCost = operationMeters * rateInfo.rate;
               operationCostTotal += operationCost;
               operationRates.add(rateInfo.rate);
@@ -7113,7 +7113,17 @@
       add("sizeValidation", "корректные параметры размера", form.sizeRows, result.sizeValidation.error || "Проверьте размеры и количество.", form.sizeBlockError, "sizeBlock");
     }
 
-    const invalidVeneerConsumption = (result?.veneerConsumptions || []).find((consumption) => !consumption.valid);
+    // The actual veneer input is hidden in quick calculations. If automatic
+    // consumption is unknown, preserve the pending cost but allow preliminary PDF.
+    // Detailed calculations and invalid manual consumptions remain blocked.
+    const invalidVeneerConsumption = (result?.veneerConsumptions || []).find((consumption) => {
+      if (consumption.valid) return false;
+      const unresolvedAutomaticYield = !isDetailedPanelCalculation()
+        && !consumption.actualVeneerAreaManual
+        && !Number.isFinite(consumption.recommendedVeneerAreaM2)
+        && !Number.isFinite(consumption.actualVeneerAreaM2);
+      return !unresolvedAutomaticYield;
+    });
     if (invalidVeneerConsumption) {
       add(`veneerActual:${invalidVeneerConsumption.id || invalidVeneerConsumption.materialId || "current"}`, "фактическое количество шпона", form.priceAdjustmentsBlock,
         invalidVeneerConsumption.validationError || "Укажите фактическое количество шпона.", null, "block");

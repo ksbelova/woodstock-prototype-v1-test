@@ -185,7 +185,7 @@
   if(record.layoutTzComment)notes.push({text:'Требования к раскладке: '+record.layoutTzComment,style:'infoText'});
   if(wall||scenario==='details') notes.push({text:(wall?'Переход рисунка на панелях: ':'Переход рисунка на деталях: ')+(record.patternTransitionRequested?'да':'нет'),style:'infoText'});
   notes.push({text:'Дополнительные требования',style:'sectionTitle'},{text:record.comment||'—',style:'infoText'},{text:'Файлы: '+(files.join(', ')||'нет'),style:'infoSmall'},{text:'Связь с менеджером: '+($('managerContactInput').checked?'нужна':'не запрошена'),style:'infoSmall'});
-  return {dontBreakRows:false,title,numberPrefix:'КР-ПЛ-',subtitle:'Краткий расчёт плит',widths:[12,52,110,103,57,24,38,65,65],header:['№','Основа','Шпон','Раскладка и обработка','Размер, мм','Шт.','Площадь, м²','Цена с НДС','Сумма с НДС'].map(text=>({text,style:'tableHeader'})),rows,afterPrice:notes};
+  return {dontBreakRows:false,title,numberPrefix:'КР-ПЛ-',subtitle:'Краткий расчёт плит',preliminaryPriceLabels:true,widths:[12,52,110,103,57,24,38,65,65],header:['№','Основа','Шпон','Раскладка и обработка','Размер, мм','Шт.','Площадь, м²','Цена с НДС','Сумма с НДС'].map(text=>({text,style:'tableHeader'})),rows,afterPrice:notes};
  }
  // Standard sizes are tied to the chosen base. A cleared base must not retain a previously selected format.
  function clearBaseDependentStandardSizes(){
@@ -225,6 +225,8 @@
   contact=Common.createContact({form:f,ui,submitted:()=>submitted,renderAll:()=>api.recalculate()});contact.bind();
   f.files.addEventListener('change',()=>api.recalculate());
   $('getCalculationButton').addEventListener('click',submit);
+  // Присадка влияет на полноту стоимости, обновляем чек без другого действия.
+  $('boringSelect')?.addEventListener('change',()=>render(api.result()));
   if(wall||scenario==='details') $('quickToningCheckbox')?.addEventListener('change',()=>{
    api.form.toningSelect.value=['lacquer_acrylic','lacquer_polyurethane'].includes(api.form.finishSelect.value)&&$('quickToningCheckbox').checked?'yes':'no';
    api.form.toningSelect.dispatchEvent(new Event('change',{bubbles:true}));
