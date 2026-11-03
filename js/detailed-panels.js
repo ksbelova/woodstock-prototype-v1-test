@@ -4047,7 +4047,8 @@
       : edgeState.operationRateClass === "thick" ? 1.5
         : null;
     if (!Number.isFinite(tariffClassThickness)) return null;
-    return Core.edgeRateFor(data, baseId, thicknessRaw, tariffClassThickness, runningM, { machineThresholdExclusive: isDetailedPanelCalculation() });
+    // Станок применяется только при метраже строго свыше порога (для всех сценариев).
+    return Core.edgeRateFor(data, baseId, thicknessRaw, tariffClassThickness, runningM, { machineThresholdExclusive: true });
   }
 
   function standardSheetPrices(standard, condition, warnings = []) {
@@ -5588,7 +5589,7 @@
               breakdown.push({
                 label: `Кромление — операция · позиция ${item.position}`,
                 value: operationCost,
-                note: `${round(operationMeters, 2)} пог. м × ${money(rateInfo.rate)}/пог. м · ${rateInfo.method === "machine" ? `станок (общий метраж ${isDetailedPanelCalculation() ? "свыше" : "от"} ${rateInfo.threshold} пог. м)` : rateInfo.method === "manual" ? `вручную (общий метраж до ${rateInfo.threshold} пог. м${isDetailedPanelCalculation() ? " включительно" : ""})` : "ранее подтверждённый тариф"}.`
+                note: `${round(operationMeters, 2)} пог. м × ${money(rateInfo.rate)}/пог. м · ${rateInfo.method === "machine" ? `станок (общий метраж свыше ${rateInfo.threshold} пог. м)` : rateInfo.method === "manual" ? `вручную (общий метраж до ${rateInfo.threshold} пог. м включительно)` : "ранее подтверждённый тариф"}.`
               });
             } else if (productionOperation || operationPriceComesFromProduction(base)) {
               operationIncomplete = true;
@@ -7000,6 +7001,14 @@
     return (result.itemResults||[]).some(item=>isExactFinishedDetail(item)&&!manufacturingCostFromProduction(item)&&
       !item.productionCost?.coveredReasons.includes('Работа с толстым шпоном'));
   }
+  function isBlockingVeneerConsumption(consumption) {
+    if (consumption.valid) return false;
+    const unresolvedAutomaticYield = !isDetailedPanelCalculation()
+      && !consumption.actualVeneerAreaManual
+      && !Number.isFinite(consumption.recommendedVeneerAreaM2)
+      && !Number.isFinite(consumption.actualVeneerAreaM2);
+    return !unresolvedAutomaticYield;
+  }
   function currentBlockingValidationIssues(result = lastCalculation) {
     const issues = [];
     const add = (key, label, control, message, errorNode = null, kind = "field") => {
@@ -7113,17 +7122,10 @@
       add("sizeValidation", "корректные параметры размера", form.sizeRows, result.sizeValidation.error || "Проверьте размеры и количество.", form.sizeBlockError, "sizeBlock");
     }
 
-    // The actual veneer input is hidden in quick calculations. If automatic
-    // consumption is unknown, preserve the pending cost but allow preliminary PDF.
-    // Detailed calculations and invalid manual consumptions remain blocked.
-    const invalidVeneerConsumption = (result?.veneerConsumptions || []).find((consumption) => {
-      if (consumption.valid) return false;
-      const unresolvedAutomaticYield = !isDetailedPanelCalculation()
-        && !consumption.actualVeneerAreaManual
-        && !Number.isFinite(consumption.recommendedVeneerAreaM2)
-        && !Number.isFinite(consumption.actualVeneerAreaM2);
-      return !unresolvedAutomaticYield;
-    });
+    // Общая проверка для бокового чека и экспорта.
+    // Неизвестный автоматический расход в кратком расчёте оставляет цену
+    // предварительной, но не блокирует PDF с неучтённой стоимостью шпона.
+    const invalidVeneerConsumption = (result?.veneerConsumptions || []).find(isBlockingVeneerConsumption);
     if (invalidVeneerConsumption) {
       add(`veneerActual:${invalidVeneerConsumption.id || invalidVeneerConsumption.materialId || "current"}`, "фактическое количество шпона", form.priceAdjustmentsBlock,
         invalidVeneerConsumption.validationError || "Укажите фактическое количество шпона.", null, "block");
@@ -8367,7 +8369,7 @@
       form.saveStatus.textContent = lastCalculation.layoutValidation.error;
       return;
     }
-    const invalidVeneerConsumption = (lastCalculation.veneerConsumptions || []).find((consumption) => !consumption.valid);
+    const invalidVeneerConsumption = (lastCalculation.veneerConsumptions || []).find(isBlockingVeneerConsumption);
     if (invalidVeneerConsumption) {
       form.saveStatus.textContent = invalidVeneerConsumption.validationError || "Укажите фактическое количество шпона.";
       return;
