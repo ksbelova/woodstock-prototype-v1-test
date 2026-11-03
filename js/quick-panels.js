@@ -199,7 +199,7 @@
    const position=edge.positionSettings?.find(item=>item.position===row.position);
    if(!position)return 'См. спецификацию кромки';
    if(!position.applies)return 'Не нужна';
-   return [edge.typeName,edge.veneerName||edge.name,Number.isFinite(position.thicknessMm)?number(position.thicknessMm)+' мм':'',Number.isFinite(position.widthMm)?number(position.widthMm)+' мм':'',position.sides,number(position.calculatedMeters)+' пог. м'].filter(Boolean).join(' · ');
+   return [edge.typeName,edge.veneerName||edge.name,Number.isFinite(position.thicknessMm)?number(position.thicknessMm)+' мм':'',Number.isFinite(position.widthMm)?number(position.widthMm)+' мм':'',position.sides,number(position.calculatedMeters)+' пог. м',position.priceCatalogSource||edge.priceCatalogSource].filter(Boolean).join(' · ');
   };
   const boring=$('boringSelect')?.value==='yes';
   const rows=record.sizes.map(row=>{

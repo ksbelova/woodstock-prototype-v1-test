@@ -18,3 +18,20 @@ assert(!data.orderedEdgeCatalog.some(x=>x.veneerName==='DUNA 002S 3D'&&x.typeId=
 assert(data.orderedEdgeUnavailable.some(x=>x.material==='DUNA 002S 3D'&&x.typeId==='vl_s'&&x.sourceValue==='Х'));
 assert.equal(context.automaticEdgePrice(context.edgeCatalogPriceRow(albero,19),'retail',5000).price,albero.pricesPerM2.retail*.019,'Deferred volume changes line price');
 console.log(JSON.stringify({stockWidthsUnchanged:true,sourceCombinations:2233,explicitMissing:44,priceChecks:checks,albero19mm50m:4366.2}));
+// Exercise the real selection/serialization path with form controls, without a DOM.
+context.form={clientConditionSelect:{value:'retail'}};
+let controls;context.edgeControls=()=>controls;
+context.isQuickWallPanel=()=>false;context.isDetailedPanelCalculation=()=>false;context.isQuickStandardPanel=()=>false;
+context.edgeWidthFitsProduct=()=>true;context.quickPanelFinishedThicknessMm=()=>10;
+context.edgeTypeById=id=>data.edgeTypes.find(x=>x.id===id);
+for(const name of ['edgeNameGroups','edgeNameGroupForInput','currentEdgeThickness','resolveEdgeCatalogItem','edgeSelectionState'])vm.runInContext(extract(name),context);
+function select(item,width){controls={typeSelect:{value:item.typeId},materialInput:{value:item.displayName,dataset:{}},thicknessSelect:{value:String(item.thicknessMm)},widthSelect:{value:String(width)},orderWidthInput:{value:''},orderPriceInput:{value:''}};return context.edgeSelectionState('separate');}
+let stockSelections=0;
+for(const item of data.edgeCatalog)for(const width of item.availableWidths){for(const client of ['retail','loyalty','regular','vip']){context.form.clientConditionSelect.value=client;const selected=select(item,width);assert.equal(selected.catalogItemId,item.id);assert.equal(selected.pricePerRunningM,item.pricesPerRunningM[String(width)][client]);assert.equal(selected.stockProgram,true);stockSelections++;}}
+context.form.clientConditionSelect.value='retail';
+const orderSelected=select(albero,19);assert.equal(orderSelected.orderedProgram,true);assert.equal(orderSelected.priceCatalogCell,'F127');assert(Math.abs(orderSelected.pricePerRunningM*50-4366.2)<1e-8);
+const beech=data.edgeCatalog.find(x=>x.displayName==='Бук'&&x.typeId==='thick'&&x.thicknessMm===1);
+assert.equal(select(beech,19).stockProgram,true);
+assert.equal(select(beech,100).orderedProgram,true,'Stock width 100 must fall back to order price');
+assert.equal(select(albero,251).valid,false,'Outside order width range');
+console.log(JSON.stringify({stockSelectionChecks:stockSelections,orderSourceAndStockFallback:true}));

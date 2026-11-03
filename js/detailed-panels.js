@@ -1447,7 +1447,7 @@
   function edgeWidthPeers(item) {
     return item ? edgeCatalogItems(item.typeId).filter(other =>
       normalizeEdgeLookup(other.veneerName || other.displayName) === normalizeEdgeLookup(item.veneerName || item.displayName) &&
-      Number(other.thicknessMm) === Number(item.thicknessMm)) : [];
+      (edgeTypeById(item.typeId)?.thicknessMode === "none" || Number(other.thicknessMm) === Number(item.thicknessMm))) : [];
   }
 
   function edgeAvailableWidths(item) {

@@ -144,7 +144,7 @@
     const base=[String(index+1),join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,edge.priceCatalogSource]),n(edge.widthMm)+' / '+(edge.thicknessApplicable?n(edge.thicknessMm):'—')];
     const rows=[];
     if(edge.mode==='attached'){
-      (edge.positionSettings||[]).filter(item=>item.applies).forEach(item=>rows.push([(index+1)+'.'+item.position,base[1],n(item.widthMm??edge.widthMm)+' / '+n(item.thicknessMm??edge.thicknessMm),item.sides,n(item.geometricMeters),n(item.calculatedMeters),money(item.pricePerRunningM??edge.pricePerRunningM),'В составе итога ниже','В составе итога ниже']));
+      (edge.positionSettings||[]).filter(item=>item.applies).forEach(item=>rows.push([(index+1)+'.'+item.position,join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,item.priceCatalogSource||edge.priceCatalogSource]),n(item.widthMm??edge.widthMm)+' / '+n(item.thicknessMm??edge.thicknessMm),item.sides,n(item.geometricMeters),n(item.calculatedMeters),money(item.pricePerRunningM??edge.pricePerRunningM),'В составе итога ниже','В составе итога ниже']));
     }
     rows.push([...base,edge.mode==='attached'?'Итого по изделию':edge.sides||'—',n(edge.geometricMeters),join([n(edge.orderedMeters??edge.meters??edge.calculatedMeters),edge.manuallyAdjusted?'Ручная корректировка':'Автоматически']),money(edge.pricePerRunningM),money(edge.materialCost),edge.operationPricingStatus==='included_in_production_quote'?'В стоимости производства':edge.operationPricingStatus==='not_required'?'Не требуется':money(edge.operationCost)]);
     return rows;
