@@ -1940,3 +1940,19 @@ input[type="file"]::file-selector-button:hover {
 .specification-page .spec-services { display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0; }
 .specification-page .spec-services label { display: flex; align-items: center; gap: 8px; }
 .specification-page .spec-services input { width: auto; }
+
+/* Отметки для согласования неподтверждённых допущений в рабочем прототипе. */
+.quick-panels-page .prototype-review-note {
+  display: block;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #c43a3a;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #982323;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.quick-panels-page .prototype-review-note strong {
+  font-weight: 700;
+}

@@ -116,6 +116,20 @@
   if(form.finishSelect.value==='enamel'&&!form.enamelVariantSelect.value){syncing=true;form.enamelVariantSelect.value='Грунт + эмаль';api.recalculate();syncing=false;result=api.result();}
   const ready=!!result?.base&&!!result.validSizes?.length&&!api.issues().length&&(standard||certified||!!form.finishSelect.value);
   const boring=$('boringSelect')?.value==='yes';
+  // Внутренние отметки спорных допущений: они не влияют на цену и не входят в PDF.
+  const faceThickness=Number(form.veneerThicknessSelect.value);
+  const compensatorNote=$('quickCompensatorReviewNote');
+  if(compensatorNote){
+    const selected=Boolean(form.veneerThicknessSelect.value)&&[2,2.5].some(value=>Math.abs(faceThickness-value)<0.001);
+    compensatorNote.classList.toggle('is-hidden',!selected);
+  }
+  const paperEdgeNote=$('quickPaperEdgeReviewNote');
+  if(paperEdgeNote){
+    const paperEdgeSelected=form.reverseSideSelect.value==='paper'
+      &&Number(form.veneeredSidesSelect.value)===1
+      &&form.edgeModeSelect.value===(standard?'separate':'attached');
+    paperEdgeNote.classList.toggle('is-hidden',!paperEdgeSelected);
+  }
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
   $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
