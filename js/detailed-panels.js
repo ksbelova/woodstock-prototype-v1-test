@@ -1630,8 +1630,11 @@
     const face = selectedVeneerThickness();
     if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(face)) return null;
     const two = Number(form.veneeredSidesSelect.value) === 2;
+    // Для расчёта итоговой толщины бумага на стороне Б = 0 мм.
+    // Толщина бумаги не требуется для выбора кромки: запас учитывается отдельно.
     const back = two ? calibrationSideBThicknessMm()
-      : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection() : null;
+      : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection()
+        : form.reverseSideSelect.value === "paper" ? 0 : null;
     return Number.isFinite(back) ? base + face + back : null;
   }
 
@@ -1642,7 +1645,8 @@
     if (!Number.isFinite(base) || !Number.isFinite(face)) return null;
     const back = Number(form.veneeredSidesSelect.value) === 2
       ? calibrationSideBThicknessMm()
-      : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection() : null;
+      : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection()
+        : form.reverseSideSelect.value === "paper" ? 0 : null;
     if (!Number.isFinite(back)) return null;
     const confirmed = confirmedFinishedThicknessAfterCalibrationMm(base);
     return Number.isFinite(confirmed) ? confirmed : base + face + back;
@@ -1656,18 +1660,7 @@
       return Number.isFinite(thickness) && value > thickness;
     }
     const finished = quickPanelFinishedThicknessMm();
-    if (Number.isFinite(finished)) return value + 1e-9 >= finished + 4;
-    // Для бумаги стороны Б толщины в справочнике нет. При основе до 10 мм и шпоне 0,6 мм
-    // используем кромку от 19 мм как согласованное для краткого расчёта допущение.
-    // Цена берётся из фактически выбранной позиции прайса, а не из условной толщины бумаги.
-    if ((isQuickWallPanel() || isQuickStandardPanel()) && Number(form.veneeredSidesSelect.value) === 1 && form.reverseSideSelect.value === "paper") {
-      const base = parseThicknessComposition(currentBaseThicknessRaw()).total;
-      const face = selectedVeneerThickness();
-      if (Number.isFinite(base) && base > 0 && base <= 10 && Number.isFinite(face) && Math.abs(face - 0.6) < 0.001) {
-        return value + 1e-9 >= Math.max(19, base + face + 4);
-      }
-    }
-    return value > minimumAttachedEdgeWidth();
+    return Number.isFinite(finished) ? value + 1e-9 >= finished + 4 : value > minimumAttachedEdgeWidth();
   }
 
   function minimumAttachedEdgeWidth() {

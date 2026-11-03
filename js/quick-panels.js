@@ -131,13 +131,6 @@
       &&form.reverseSideSelect.value==='rough';
     roughOneMmNote.classList.toggle('is-hidden',!roughSelected);
   }
-  const paperEdgeNote=$('quickPaperEdgeReviewNote');
-  if(paperEdgeNote){
-    const paperEdgeSelected=form.reverseSideSelect.value==='paper'
-      &&Number(form.veneeredSidesSelect.value)===1
-      &&form.edgeModeSelect.value===(standard?'separate':'attached');
-    paperEdgeNote.classList.toggle('is-hidden',!paperEdgeSelected);
-  }
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
   $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
