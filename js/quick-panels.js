@@ -73,6 +73,42 @@
    const list=reasons.length?reasons.join('; '):'стоимость материалов или работ, которые требуется уточнить';
    return 'Это предварительный расчёт. В сумму пока не вошли: '+list+'. Менеджер уточнит детали заказа и назовёт стоимость, максимально близкую к итоговой';
  }
+ // Внутренние вопросы из вкладок «Краткий» и «Второй круг правок».
+ // Пометки принадлежат только интерфейсу: productDocument не читает их из DOM.
+ function renderReviewNotes(){
+  const form=api.form,face=Number(form.veneerThicknessSelect.value);
+  const faceSelected=Boolean(form.veneerThicknessSelect.value);
+  const finish=form.finishSelect.value,toning=['lacquer_acrylic','lacquer_polyurethane'].includes(finish);
+  const note=(id,anchorId,text,visible=true)=>{
+   const anchor=$(anchorId);if(!anchor)return;
+   let element=$(id);
+   if(!element){
+    element=document.createElement('span');element.id=id;element.className='prototype-review-note';element.setAttribute('role','note');
+    const heading=document.createElement('strong');heading.textContent='Внутренняя пометка · требует согласования. ';
+    element.append(heading,document.createTextNode(text));
+    (anchor.closest('.field')||anchor).append(element);
+   }
+   element.classList.toggle('is-hidden',!visible);
+  };
+  if(wall){
+   note('quickOnePointFiveReviewNote','veneerThicknessSelect','Для стеновых панелей при лицевом слое 1,5 мм принят шпон с одной стороны и черновой шпон на обороте. Итоговый вариант нужно сообщить производству: ранее на встрече звучало правило о шпоне с двух сторон от 1,5 мм.',faceSelected&&Math.abs(face-1.5)<0.001);
+   note('quickTwoMmFinishReviewNote','veneerThicknessSelect','При лицевом слое 2 мм покрытие считается только по стороне А, по аналогии с 2,5 мм. Применимость этого правила к 2 мм отдельно не подтверждена.',faceSelected&&Math.abs(face-2)<0.001);
+   note('quickEdgeSidesReviewNote','edgeSidesSelect','Три варианта сторон кромления — по периметру, по длинным или по коротким сторонам — выбраны командой. Их достаточность для стеновых панелей требует подтверждения производства.');
+   note('quickEdgeWidthReviewNote','edgeThicknessSelect','Правило подбора ближайшей ширины кромки с запасом минимум 4 мм к итоговой толщине изделия выведено командой из примеров производства. Формулировка правила требует подтверждения.');
+   note('quickFinishDescriptionReviewNote','finishSelect','Описания свойств акрилового и полиуретанового лаков и эмали подготовлены командой по общим свойствам материалов. Их нужно сверить с покрытиями, которые использует Woodstock.',Boolean(finish)&&finish!=='none');
+   note('quickPolyurethaneReviewNote','finishSelect','Для полиуретанового лака нет подтверждённого тарифа: его стоимость не входит в предварительную сумму. Нужно согласовать, оставлять ли этот вариант в кратком расчёте.',finish==='lacquer_polyurethane');
+  }
+  if(standard){
+   const edge=form.edgeModeSelect.value==='separate';
+   note('quickSeparateEdgeTypeReviewNote','separateEdgeTypeSelect','Поле «Тип кромки» временно сохранено. Решение о его составе и необходимости в кратком расчёте стандартной плиты пока не принято.',edge);
+   note('quickSeparateEdgeMinimumReviewNote','separateEdgeMetersInput','Временно применяется минимум 50 пог. м. Производство обсуждало снижение до 20 пог. м; окончательный минимум и его применение к позиции или всей заявке не подтверждены.',edge);
+   note('quickSeparateEdgeWidthReviewNote','separateEdgeThicknessSelect','Ширина временно подбирается по правилу стеновых панелей: ближайшая ширина из прайса с запасом минимум 4 мм к итоговой толщине плиты. Правило выведено командой из примеров производства. Для отдельной кромки может требоваться большая ширина; возможность её выбора клиентом пока не согласована.',edge);
+  }
+  if(wall||scenario==='details'){
+   note('quickToningRateReviewNote','quickToningField','В расчёте применяется доплата за тонировку 1000 ₽/м². Источник этого тарифа в записях встреч не указан; ставку нужно подтвердить у производства.',toning&&form.toningSelect.value==='yes');
+  }
+  if(scenario==='details')note('quickBoringDescriptionReviewNote','boringSelect','Вопрос и пояснение о присадке сформулированы командой. Диаметр отверстия под петлю 35 мм взят из свода правок и отдельно представителем производства не подтверждён.');
+ }
  function render(result){
   if(syncing)return;
   const form=api.form;
@@ -132,6 +168,7 @@
     roughOneMmNote.classList.toggle('is-hidden',!roughSelected);
   }
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
+  renderReviewNotes();
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
   $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
   $('priceLabel').textContent='Ориентировочная стоимость с НДС';
