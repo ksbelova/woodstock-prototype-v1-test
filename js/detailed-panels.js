@@ -1643,7 +1643,18 @@
       return Number.isFinite(thickness) && value > thickness;
     }
     const finished = quickPanelFinishedThicknessMm();
-    return Number.isFinite(finished) ? value + 1e-9 >= finished + 4 : value > minimumAttachedEdgeWidth();
+    if (Number.isFinite(finished)) return value + 1e-9 >= finished + 4;
+    // Для бумаги стороны Б толщины в справочнике нет. При основе до 10 мм и шпоне 0,6 мм
+    // используем кромку от 19 мм как согласованное для краткого расчёта допущение.
+    // Цена берётся из фактически выбранной позиции прайса, а не из условной толщины бумаги.
+    if ((isQuickWallPanel() || isQuickStandardPanel()) && Number(form.veneeredSidesSelect.value) === 1 && form.reverseSideSelect.value === "paper") {
+      const base = parseThicknessComposition(currentBaseThicknessRaw()).total;
+      const face = selectedVeneerThickness();
+      if (Number.isFinite(base) && base > 0 && base <= 10 && Number.isFinite(face) && Math.abs(face - 0.6) < 0.001) {
+        return value + 1e-9 >= Math.max(19, base + face + 4);
+      }
+    }
+    return value > minimumAttachedEdgeWidth();
   }
 
   function minimumAttachedEdgeWidth() {
@@ -6037,7 +6048,6 @@
     }
     const pendingQuickRules = [];
     if (isQuickWallPanel() && Math.abs(veneerThickness - 2) < 0.001) pendingQuickRules.push("Лицевой слой 2 мм: материал и цена оборота не согласованы; показанная стоимость предварительная.");
-    if ((isQuickWallPanel() || isQuickStandardPanel()) && form.edgeModeSelect.value !== "none" && sides === 1 && form.reverseSideSelect.value === "paper") pendingQuickRules.push("Толщина бумаги не подтверждена: ширина и стоимость кромки предварительные, требуется согласование производства.");
     if (pendingQuickRules.length) {
       hasPartialPrice = true;
       requiresProductionCost = true;
