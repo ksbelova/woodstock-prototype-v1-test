@@ -239,6 +239,9 @@
    const prepareRows=()=>{document.querySelectorAll('[data-size-row]').forEach(row=>{if(!row.dataset.sizeMode)api.customSize(row,{focus:false});});};
    prepareRows();new MutationObserver(prepareRows).observe(api.form.sizeRows,{childList:true});
   }
+  // В кратком расчёте фасадов скрытая фаска не должна попадать в цену.
+  // Элемент остаётся в DOM для общего расчётного контроллера.
+  if(scenario==='details') api.form.edgeBevelSelect.value='no';
   // These are the existing detailed fields, hidden for the shortened client scenario.
   ['toningSelect','isolatorSelect','positionFinishToggle','positionEdgeToggle','lacquerExecutionSelect','lacquerProcessSelect','enamelVariantSelect','edgeOrderPriceInput','separateEdgeOrderPriceInput'].forEach(id=>{$(id)?.closest('.field')?.setAttribute('data-quick-hidden','');});
   api.form.finishSelect.dispatchEvent(new Event('change',{bubbles:true}));api.recalculate();render(api.result());
