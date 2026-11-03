@@ -2395,6 +2395,10 @@
         return `<option value="${esc(raw)}">${esc(label)}</option>`;
       }).join("");
       if (options.length === 1) form.baseThicknessSelect.value = String(options[0]);
+      // Краткий расчёт стеновых панелей: для ДСП с единственной толщиной
+      // значение выбирается автоматически, но поле остаётся на своём месте.
+      // Блокируем только изменение select, не его отображение и не значение.
+      form.baseThicknessSelect.disabled = isQuickWallPanel() && base.id === "dsp" && options.length === 1;
     }
 
     updateBaseProductionCostHint(); updateThicknessWarnings(); updateEdgeUI(); updateCalibrationUI(); renderStandardSizes(); revalidateCustomSizeRows(); recalc();
