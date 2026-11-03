@@ -28,6 +28,51 @@
   }),
   changed:result=>{if(api)render(result);}
  };
+
+ const preliminaryDisclaimer='Это предварительный расчёт. Точную стоимость назовёт менеджер, когда уточнит детали вашего заказа';
+ // Здесь меняется только язык сообщений для клиента, а не расчётные предупреждения.
+ function clientWarningReason(raw){
+   const source=String(raw||'').trim();
+   if(!source)return '';
+   if(/^Присадка:/i.test(source))return 'присадка — отверстия под петли и/или ручки';
+   if(/^Не выбрана основа/i.test(source))return 'стоимость основы (материал не выбран)';
+   if(/^Не задана корректная толщина основы/i.test(source))return 'стоимость основы (толщина не указана)';
+   if(/^Не выбран тип материала/i.test(source))return 'стоимость шпона (тип не выбран)';
+   if(/^Не выбрана доступная толщина лицевого шпона/i.test(source))return 'стоимость шпона (толщина не выбрана)';
+   if(/^Не добавлен ни один заполненный размер/i.test(source))return 'стоимость изделий (не указаны размеры)';
+   if(/^Введите количество целым числом/i.test(source))return 'стоимость изделий (уточните количество)';
+   if(/^(Выберите раскладку шпона|Выбранная раскладка недоступна)/i.test(source))return 'стоимость раскладки шпона (уточните раскладку)';
+   if(/^Добавьте описание раскладки/i.test(source))return 'стоимость раскладки по индивидуальному заданию';
+   if(/^Готовая рубашка:/i.test(source))return 'стоимость приклеивания готового шпона';
+   if(/^(Сторона Б: цена категории|Сторона Б.*Extra\/AA|Лицевой слой 2 мм:)/i.test(source))return 'стоимость шпона обратной стороны';
+   if(/^Черновая сторона Б:/i.test(source)||/толщины чернового шпона нет подтверждённой ставки/i.test(source))return 'стоимость чернового шпона обратной стороны';
+   if(/(ставка бумаги на обратной стороне|Для бумаги на обратной стороне ставка)/i.test(source))return 'стоимость бумаги на обратной стороне';
+   if(/^Лак полиуретановый:/i.test(source))return 'покрытие полиуретановым лаком';
+   if(/^Глянец 100%:/i.test(source))return 'покрытие с блеском 100%';
+   if(/технологической схемы\/числа сторон нет подтверждённого/i.test(source))return 'стоимость выбранного покрытия';
+   if(/^Фаска:/i.test(source))return 'стоимость фаски на кромке';
+   if(/(операции кромления|кромление требуется|тарифа операции кромления)/i.test(source))return 'работа по кромлению';
+   if(/(кромка отсутствует в складском прайсе|складской кромки нет цены)/i.test(source))return 'стоимость выбранной кромки';
+   if(/^Калибровка ДСП:/i.test(source)||/Для калибровки не задана базовая ставка/i.test(source))return 'обработка основы до нужной толщины';
+   if(/чистовой припил|тарифа припила/i.test(source))return 'чистовой распил изделия';
+   if(/^(Диагональ 45°: ставка|Не подтверждена ставка диагонали)/i.test(source))return 'работа по диагональной раскладке шпона';
+   if(/Не подтверждена ставка ёлочки/i.test(source))return 'работа по раскладке шпона «ёлочкой»';
+   if(/^Нестандарт со шпоном/i.test(source))return 'дополнительная работа со шпоном выбранной толщины';
+   if(/(нет подтверждённой ставки нестандарта|Стандарт по запросу: нет подтверждённой ставки|Базовая стоимость не включена)/i.test(source))return 'стоимость изготовления изделия из выбранной основы';
+   if(/(для компонента «|нет подтверждённой цены|не подставляется)/i.test(source))return 'стоимость выбранного материала или производственной операции';
+   if(/^(Фактическое количество шпона не задано|Укажите фактическое количество шпона)/i.test(source))return 'стоимость шпона (требуется уточнить расход)';
+   if(/готовой рубашки/i.test(source))return 'стоимость готового шпона';
+   return source.replace(/\s*Расчёт неполный[.;]?/gi,'').replace(/[.\s]+$/,'');
+ }
+ function clientWarningReasons(result,boring){
+   const raw=[...(result?.warnings||[]),...(boring?['Присадка: стоимость определяет производство.']:[])];
+   return [...new Set(raw.map(clientWarningReason).filter(Boolean))];
+ }
+ function preliminaryPartialText(result,boring){
+   const reasons=clientWarningReasons(result,boring);
+   const list=reasons.length?reasons.join('; '):'стоимость материалов или работ, которые требуется уточнить';
+   return 'Это предварительный расчёт. В сумму пока не вошли: '+list+'. Менеджер уточнит детали заказа и назовёт стоимость, максимально близкую к итоговой';
+ }
  function render(result){
   if(syncing)return;
   const form=api.form;
@@ -74,9 +119,9 @@
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
   $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
-  $('priceLabel').textContent=partial?'Стоимость рассчитанной части с НДС':'Ориентировочная стоимость с НДС';
+  $('priceLabel').textContent='Ориентировочная стоимость с НДС';
   $('partialWarning').classList.toggle('is-hidden',!partial);
-  $('partialWarning').textContent=partial?'Расчёт неполный. '+[...(result.warnings||[]),...(boring?['Присадка: стоимость определяет производство.']:[])].join(' '):'';
+  $('partialWarning').textContent=partial?preliminaryPartialText(result,boring):'';
   $('quickArea').textContent=result?.base&&result.totalArea>0?number(result.totalArea)+' м²':'—';
   if((wall||standard)&&$('quickEdgeWidth')) {
    const width=result?.edge?.widthMm;
@@ -109,7 +154,7 @@
    `${value(row.knownPricePerPiece)} / шт.\n${value(row.knownPricePerM2)} / м²`,value(row.knownSubtotal)
   ];});
   const partial=!result.priceCalculationComplete||$('boringSelect')?.value==='yes';
-  const notes=[];
+  const notes=[{text:preliminaryDisclaimer,style:'infoSmall',margin:[0,4,0,8]}];
   const rowPartial=record.sizes.some(row=>row.pricingPartial)||boring;
   if(rowPartial)notes.push({text:'* Частичная стоимость позиции: учтены только рассчитанные составляющие.',style:'infoSmall'});
   if(Number.isFinite(result.orderLevelUnallocatedCost)&&Math.abs(result.orderLevelUnallocatedCost)>0.000001)notes.push({text:'Общие рассчитанные затраты заказа, не распределённые по изделиям: '+money(result.orderLevelUnallocatedCost)+'. Они включены в итог один раз.',style:'infoSmall'});
@@ -118,7 +163,7 @@
   const breakdownRounding=round(round(result.finalTotal)-result.breakdown.reduce((sum,item)=>sum+round(item.value),0));
   if(rowRounding||breakdownRounding)notes.push({text:'Расчёт выполнен без промежуточного округления. Разница округления: по позициям '+money(rowRounding)+'; по составляющим '+money(breakdownRounding)+'.',style:'infoSmall'});
   if(certified)notes.push({text:"ГСП: состав кромки и покрытия по сертификату КМ1 подтверждает производство.",style:"infoText"});
-  if(partial)notes.push({text:'Расчёт неполный. Указана только рассчитанная часть. Полную стоимость подтвердит менеджер.',style:'infoText',margin:[0,8,0,4]},{ul:[...result.warnings,...($('boringSelect')?.value==='yes'?['Присадка: стоимость производства.']:[])],style:'infoSmall'});
+  if(partial)notes.push({text:preliminaryPartialText(result,boring),style:'infoText',margin:[0,8,0,4]});
   notes.push({text:'Рассчитанные составляющие',style:'sectionTitle'},{table:{headerRows:1,dontBreakRows:true,widths:Common.fitPdfTableWidths([360,179],3),body:[[{text:'Составляющая',bold:true},{text:'Стоимость с НДС',bold:true}],...result.breakdown.map(x=>[x.label,money(x.value)])]},layout:Common.pdfTableLayout()});
   if(edge.mode!=='none')notes.push({text:'Кромка — данные отдельной спецификации',style:'sectionTitle'},{text:edgeText,style:'infoSmall'});
   const files=[...new Set([...contact.fileNames(),...(record.layoutTzFiles||[]),...record.sizes.flatMap(row=>row.files||[])])];
