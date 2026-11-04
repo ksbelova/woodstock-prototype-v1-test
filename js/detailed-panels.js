@@ -724,6 +724,7 @@
         finishType: "lacquer",
         lacquerType: lacquerTypeIdForFinish(normalized.finishId),
         ...(normalized.source ? { source: normalized.source } : {}),
+        ...(typeof normalized.sidesManual === "boolean" ? { sidesManual: normalized.sidesManual } : {}),
         lacquerExecution: GLOSS_100_EXECUTION,
         lacquerGloss: "",
         lacquerProcess: "",
@@ -9617,6 +9618,12 @@
       // Previously saved records may lack the source marker. Compare only editable
       // finish settings, not calculated amounts, summary, position or identifiers.
       const normalized = normalizeFinishConfig(item, { allowInherit: true });
+      // Legacy entries without editorState may not contain the sidesManual flag.
+      // Keep a saved per-position side count that differs from the veneer default.
+      if (normalized.finishId !== "inherit" && typeof item.sidesManual !== "boolean" &&
+          normalized.sides && normalized.sides !== defaultFinishSides()) {
+        normalized.sidesManual = true;
+      }
       const globalConfig = currentGlobalFinishConfig();
       const differsFromGlobal = finishSettingKeys.some(key => normalized[key] !== globalConfig[key]);
       if (item.source === "position" || (item.source !== "global" && differsFromGlobal)) {
