@@ -723,6 +723,7 @@
         finishId: normalized.finishId,
         finishType: "lacquer",
         lacquerType: lacquerTypeIdForFinish(normalized.finishId),
+        ...(normalized.source ? { source: normalized.source } : {}),
         lacquerExecution: GLOSS_100_EXECUTION,
         lacquerGloss: "",
         lacquerProcess: "",
