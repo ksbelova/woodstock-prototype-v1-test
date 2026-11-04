@@ -1942,7 +1942,8 @@ input[type="file"]::file-selector-button:hover {
 .specification-page .spec-services input { width: auto; }
 
 /* Отметки для согласования неподтверждённых допущений в рабочем прототипе. */
-.quick-panels-page .prototype-review-note {
+.quick-panels-page .prototype-review-note,
+.base-production-note {
   display: block;
   margin: 10px 0 0;
   padding: 10px 12px;

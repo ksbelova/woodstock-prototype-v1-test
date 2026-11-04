@@ -2456,6 +2456,22 @@
       ? data?.baseThicknessPriceModes?.[base.id]?.[thicknessKey]
       : null;
     const scenarios = data?.baseThicknessScenarioPriceModes?.[base?.id]?.[thicknessKey];
+    if (isDetailedPanelCalculation()) {
+      const sizes = readSizeRows().filter((size) => size.mode && size.length > 0 && size.width > 0);
+      const fixedProductionMode = base?.priceMode === "production"
+        || (base?.id === "mdf" && thicknessKey === "6+6+6");
+      const needsProduction = fixedProductionMode || (thicknessKey && (scenarios
+        ? sizes.some((size) => selectedBasePriceMode(size) === "production")
+        : selectedBasePriceMode() === "production"));
+      const scenarioUndetermined = !fixedProductionMode && scenarios && !sizes.length;
+      form.baseProductionCostHint.classList.toggle("is-hidden", !needsProduction && !scenarioUndetermined);
+      form.baseProductionCostHint.textContent = needsProduction
+        ? "Автоматический расчёт стоимости недоступен для выбранной основы или части позиций. Запросите стоимость у производства и добавьте её на странице общей спецификации."
+        : scenarioUndetermined
+          ? "Возможность автоматического расчёта стоимости зависит от размера и параметров изготовления. Если цены нет, запросите стоимость у производства и добавьте её на странице общей спецификации."
+          : "";
+      return;
+    }
     if (scenarios) {
       const sizes = readSizeRows().filter((size) => size.mode && size.length > 0 && size.width > 0);
       const needsProduction = sizes.some((size) => selectedBasePriceMode(size) === "production");
