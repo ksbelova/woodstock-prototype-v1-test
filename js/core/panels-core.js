@@ -429,9 +429,9 @@
       // округляется вверх до половины листа; к покупке итог округляется до целого листа.
       const technicalSheetsPerSurface = Math.ceil((across * 2) - 1e-9) / 2;
       const technicalSheets = technicalSheetsPerSurface * quantity * surfaceCount;
-      const purchasedSheets = options.roundMultiSheetsPerPanel
-        ? Math.ceil(technicalSheetsPerSurface * surfaceCount - 1e-9) * quantity
-        : Math.ceil(technicalSheets - 1e-9);
+      // Половинки листов от одинаковых панелей используются в общей партии:
+      // 2 панели по 3,5 листа = 7 целых листов к закупке, а не 8.
+      const purchasedSheets = Math.ceil(technicalSheets - 1e-9);
       return {
         ...base,
         exact: true,
