@@ -76,9 +76,19 @@
     return records.flatMap(record=>{
       const edge=record.edge;if(!edge||edge.mode==='none')return [];
       const parts=edge.mode==='attached'?(edge.positionSettings||[]).filter(item=>item.applies):[{...edge,position:null,calculatedMeters:edge.orderedMeters??edge.meters}];
-      return parts.map(part=>({record,part,key:JSON.stringify([part.catalogItemId||edge.catalogItemId,part.widthMm??edge.widthMm,part.thicknessMm??edge.thicknessMm]),
-        catalog:part.catalogItemId||edge.catalogItemId,meters:part.calculatedMeters||0,originalRate:part.pricePerRunningM??edge.pricePerRunningM,
-        levels:part.volumePriceLevels||edge.volumePriceLevels,ranges:part.volumePriceRanges||edge.volumePriceRanges}));
+      return parts.map(part=>{
+        // У кромления каждой детали собственный материал, ширина и тариф в selection.
+        // Общие параметры edge нельзя использовать вместо них при разных позициях.
+        const selection=part.selection||part;
+        const catalog=selection.catalogItemId||part.catalogItemId||(edge.mode==='attached'?null:edge.catalogItemId);
+        const width=part.widthMm??selection.widthMm??edge.widthMm;
+        const thickness=part.thicknessMm??selection.thicknessMm??edge.thicknessMm;
+        return {record,part,key:JSON.stringify([catalog,width,thickness]),catalog,
+          meters:part.calculatedMeters||0,
+          originalRate:selection.pricePerRunningM??part.pricePerRunningM??(edge.mode==='attached'?null:edge.pricePerRunningM),
+          levels:selection.volumePriceLevels??part.volumePriceLevels??edge.volumePriceLevels,
+          ranges:selection.volumePriceRanges??part.volumePriceRanges??edge.volumePriceRanges};
+      });
     });
   }
   function edgeDiscount(record){
@@ -97,7 +107,10 @@
     const discount=edgeDiscount(record),rates=[...new Set(discount.entries.map(entry=>entry.rate))];
     return {...edge,materialCost:Number.isFinite(edge.materialCost)?edge.materialCost+discount.delta:null,
       pricePerRunningM:rates.length===1?rates[0]:null,
-      positionSettings:edge.positionSettings?.map(item=>({...item,pricePerRunningM:discount.entries.find(entry=>entry.part.position===item.position)?.rate??item.pricePerRunningM})),
+      positionSettings:edge.positionSettings?.map(item=>{
+        const rate=discount.entries.find(entry=>entry.part.position===item.position)?.rate;
+        return {...item,pricePerRunningM:rate??item.selection?.pricePerRunningM??item.pricePerRunningM};
+      }),
       operationPricingStatus:inProduction(record)&&quoteState().valid?'included_in_production_quote':edge.operationPricingStatus};
   }
   function productionRows(){const state=quoteState();return state.scope.length?[
@@ -131,7 +144,7 @@
       join(['А: '+material(record.materialSides?.A,record.veneerA),'Б / оборот: '+(record.sides===2?material(record.materialSides?.B,record.sideB):record.sideB),'Фанеровка: '+record.sides+' ст.']),
       join(['А: '+(record.layout||'—'),'Б: '+(record.layoutB||'—'),record.veneerCut?'Рисунок А: '+record.veneerCut:'',record.veneerBCut?'Рисунок Б: '+record.veneerBCut:'']),
       join([n(row.length)+' × '+n(row.width)+' мм',n(row.quantity)+' шт.',row.classificationName,row.manufacturingType==='allowance20'?'С припуском: '+n(row.productionLength)+' × '+n(row.productionWidth)+' мм':'']),
-      join(['Шлифовка: '+(record.sanding?'да':'нет'),'Финиш: '+finish,attached?.applies?'Кромка: '+attached.sides+' · '+n(attached.calculatedMeters)+' пог. м':edge.mode==='separate'?'Кромка отдельно':'Кромка: нет',edge.bevel?'Фаска на кромке: да':'',tech.calibration?'Калибровка: да':'',row.cleanCuttingRequired?'Чистовой припил: да':'',tech.gluing?'Проклейка основы: да':'',row.transition?'Переход рисунка: да':'',row.comment?'Комментарий: '+row.comment:'',row.files?.length?'Файлы: '+row.files.join(', '):'']),
+      join(['Шлифовка: '+(record.sanding?'да':'нет'),'Финиш: '+finish,attached?.applies?'Кромка: '+(attached.sidesName||attached.sidesId||'—')+' · '+n(attached.calculatedMeters)+' пог. м':edge.mode==='separate'?'Кромка отдельно':'Кромка: нет',edge.bevel?'Фаска на кромке: да':'',tech.calibration?'Калибровка: да':'',row.cleanCuttingRequired?'Чистовой припил: да':'',tech.gluing?'Проклейка основы: да':'',row.transition?'Переход рисунка: да':'',row.comment?'Комментарий: '+row.comment:'',row.files?.length?'Файлы: '+row.files.join(', '):'']),
       join([n(row.area)+' м²','Объём: '+(volume||'—')+' м³','Вес основы: '+weightText+' кг']),
       inProduction(record)?'Производство — общей суммой':price(row.knownPricePerPiece??row.pricePerPiece)+' / шт.\n'+price(row.knownPricePerM2??row.pricePerM2)+' / м²',inProduction(record)?'Материалы — в итоге изделия':price(row.knownSubtotal??row.total),remainingParameters(record,row)];
   }
@@ -144,7 +157,7 @@
     const base=[String(index+1),join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,edge.priceCatalogSource]),n(edge.widthMm)+' / '+(edge.thicknessApplicable?n(edge.thicknessMm):'—')];
     const rows=[];
     if(edge.mode==='attached'){
-      (edge.positionSettings||[]).filter(item=>item.applies).forEach(item=>rows.push([(index+1)+'.'+item.position,join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,item.priceCatalogSource||edge.priceCatalogSource]),n(item.widthMm??edge.widthMm)+' / '+n(item.thicknessMm??edge.thicknessMm),item.sides,n(item.geometricMeters),n(item.calculatedMeters),money(item.pricePerRunningM??edge.pricePerRunningM),'В составе итога ниже','В составе итога ниже']));
+      (edge.positionSettings||[]).filter(item=>item.applies).forEach(item=>rows.push([(index+1)+'.'+item.position,join([edge.typeName,edge.displayName||edge.veneerName||edge.name,edge.comment,item.priceCatalogSource||edge.priceCatalogSource]),n(item.widthMm??edge.widthMm)+' / '+n(item.thicknessMm??edge.thicknessMm),item.sidesName||item.sidesId||'—',n(item.geometricMeters),n(item.calculatedMeters),money(item.pricePerRunningM??item.selection?.pricePerRunningM??edge.pricePerRunningM),'В составе итога ниже','В составе итога ниже']));
     }
     rows.push([...base,edge.mode==='attached'?'Итого по изделию':edge.sides||'—',n(edge.geometricMeters),join([n(edge.orderedMeters??edge.meters??edge.calculatedMeters),edge.manuallyAdjusted?'Ручная корректировка':'Автоматически']),money(edge.pricePerRunningM),money(edge.materialCost),edge.operationPricingStatus==='included_in_production_quote'?'В стоимости производства':edge.operationPricingStatus==='not_required'?'Не требуется':money(edge.operationCost)]);
     return rows;
