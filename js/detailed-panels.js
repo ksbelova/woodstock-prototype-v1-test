@@ -9609,7 +9609,19 @@
     set(form.lacquerProcessSelect,finish.lacquerProcess);set(form.enamelVariantSelect,finish.enamelVariant);
     set(form.toningSelect,finish.toning);set(form.isolatorSelect,finish.isolator);
     const rows=Array.from(form.sizeRows.querySelectorAll('[data-size-row]'));
-    (record.finishByPosition||[]).forEach(item=>{const row=rows[item.position-1];if(row){const normalized=normalizeFinishConfig(item,{allowInherit:true}),global=currentGlobalFinishConfig();if(item.source==='position'||Object.keys(global).some(key=>normalized[key]!==global[key]))positionFinishState.set(row.dataset.rowId,normalized);}});
+    const finishSettingKeys = ["finishId", "lacquerExecution", "lacquerGloss", "lacquerProcess", "enamelVariant", "sides", "toning", "isolator"];
+    (record.finishByPosition || []).forEach(item => {
+      const row = rows[item.position - 1];
+      if (!row) return;
+      // Previously saved records may lack the source marker. Compare only editable
+      // finish settings, not calculated amounts, summary, position or identifiers.
+      const normalized = normalizeFinishConfig(item, { allowInherit: true });
+      const globalConfig = currentGlobalFinishConfig();
+      const differsFromGlobal = finishSettingKeys.some(key => normalized[key] !== globalConfig[key]);
+      if (item.source === "position" || (item.source !== "global" && differsFromGlobal)) {
+        positionFinishState.set(row.dataset.rowId, normalized);
+      }
+    });
     positionFinishOverridesEnabled=positionFinishState.size>0;
     if(positionFinishOverridesEnabled){form.positionFinishOverrides.classList.remove('is-hidden');renderPositionFinishOverrides(false);}
     const edge=record.edge||{mode:'none'};set(form.edgeModeSelect,edge.mode);
