@@ -4203,6 +4203,73 @@
 
   const veneerPurchase = Core.veneerPurchase;
 
+  // One visible multi-veneer name may represent several physical sheet formats.
+  // In the detailed calculation select by purchased material area (and waste),
+  // not by the price of the individual sheet format.
+  function multiVeneerVariantByConsumption(selected, group, sizeRows, sideLayouts) {
+    if (!isDetailedPanelCalculation() || selected?.type !== "multi" || !group || !sizeRows.length) return selected;
+    const candidates = veneerVariantsAtThickness(group, itemThickness(selected));
+    if (candidates.length < 2) return selected;
+    const rows = sizeRows.map(size => ({ size, classificationId: classifySize(size).id }))
+      .filter(({ classificationId }) => ["standard_request", "nonstandard"].includes(classificationId));
+    if (!rows.length) return selected;
+
+    const layoutGroups = [...new Set(sideLayouts)].map(layoutId => ({
+      layoutId, surfaceCount: sideLayouts.filter(value => value === layoutId).length
+    }));
+    const rules = {
+      "2500x640": { usableLengthMm: 2500, usableWidthMm: 620 },
+      ...(data?.meta?.multiVeneerUsableWidthBySheetFormatMm || {})
+    };
+
+    const ranked = candidates.map(item => {
+      const sheet = Core.veneerPhysicalSheetDimensions(item);
+      if (!sheet) return null;
+      let paidAreaM2 = 0;
+      let purchasedSheets = 0;
+
+      for (const { layoutId, surfaceCount } of layoutGroups) {
+        let nonstandardAreaM2 = 0;
+        for (const { size, classificationId } of rows) {
+          if (classificationId === "standard_request") {
+            const req = Core.standardizedSheetVeneerRequirement(item, {
+              panelLengthMm: size.length, panelWidthMm: size.width,
+              quantity: size.quantity, surfaceCount,
+              roundMultiSheetsPerPanel: true,
+              multiUsableWidthBySheetFormatMm: rules
+            });
+            if (!req.exact) return null;
+            paidAreaM2 += req.paidAreaM2;
+            purchasedSheets += req.purchasedSheets;
+          } else {
+            // Retain the existing nonstandard waste norm and whole-sheet rounding.
+            // Do not infer a new cutting or nesting pattern.
+            if ((size.calcLength || size.length) > sheet.lengthMm) return null;
+            const area = size.calcArea || size.area;
+            const recommended = veneerWasteAdjustmentState({
+              size, classificationId, layoutId, baseAreaPerSideM2: area
+            }).recommendedVeneerAreaM2;
+            if (!Number.isFinite(recommended)) return null;
+            nonstandardAreaM2 += recommended * surfaceCount;
+          }
+        }
+        if (nonstandardAreaM2 > 0) {
+          const sheets = Math.ceil(nonstandardAreaM2 / sheet.areaM2 - 1e-9);
+          paidAreaM2 += sheets * sheet.areaM2;
+          purchasedSheets += sheets;
+        }
+      }
+      return { item, paidAreaM2, purchasedSheets };
+    }).filter(Boolean);
+
+    if (!ranked.length) return selected;
+    ranked.sort((a, b) =>
+      a.paidAreaM2 - b.paidAreaM2 ||
+      a.purchasedSheets - b.purchasedSheets ||
+      String(a.item.id).localeCompare(String(b.item.id), "ru"));
+    return ranked[0].item;
+  }
+
   function calculate() {
     if (!data) return null;
     if (isDetailedPanelCalculation()) priceAdjustmentOverrides.clear();
@@ -4259,6 +4326,17 @@
     });
     if (isDetailedPanelCalculation() && form.edgeModeSelect.value === "separate") warnings.push("Минимальный объём изготовления заказной кромки требует согласования.");
     const validSizes = sizes.filter((x) => x.sizeValid && x.length > 0 && x.width > 0 && x.quantityValid);
+    if (isDetailedPanelCalculation() && validSizes.length) {
+      const sideCount = Number(form.veneeredSidesSelect.value);
+      const aLayouts = [effectiveLayoutId()];
+      if (sideCount === 2 && form.veneerBModeSelect.value === "same" && !backsideCategoryBRequired(selectedVeneerA)) {
+        aLayouts.push(effectiveLayoutBId());
+      }
+      selectedVeneerA = multiVeneerVariantByConsumption(selectedVeneerA, selectedVeneerAGroup, validSizes, aLayouts);
+      if (sideCount === 2 && form.veneerBModeSelect.value === "other") {
+        selectedVeneerB = multiVeneerVariantByConsumption(selectedVeneerB, selectedVeneerBGroup, validSizes, [effectiveLayoutBId()]);
+      }
+    }
     const layoutSelectionRequired = needsLayoutSelection();
     const rawLayout = layoutSelectionRequired ? form.layoutSelect.value : "";
     const layoutAllowed = !layoutSelectionRequired || !rawLayout || isLayoutAllowedForType(rawLayout);
