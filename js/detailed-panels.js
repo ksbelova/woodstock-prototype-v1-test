@@ -584,7 +584,9 @@
 
   function normalizeFinishConfig(config, { allowInherit = false } = {}) {
     const source = config || {};
-    const rawFinishId = source.finishId || "none";
+    const rawFinishId = source.finishId === "lacquer"
+      ? (source.lacquerType === "polyurethane" ? "lacquer_polyurethane" : "lacquer_acrylic")
+      : (source.finishId || "none");
     if (allowInherit && rawFinishId === "inherit") {
       return {
         ...source,
@@ -717,9 +719,9 @@
     const normalized = normalizeFinishConfig(config);
     if (isGloss100Finish(normalized)) {
       return {
-        finishId: "lacquer",
+        finishId: normalized.finishId,
         finishType: "lacquer",
-        lacquerType: null,
+        lacquerType: lacquerTypeIdForFinish(normalized.finishId),
         lacquerExecution: GLOSS_100_EXECUTION,
         lacquerGloss: "",
         lacquerProcess: "",
