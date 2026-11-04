@@ -489,7 +489,7 @@
   function twoSidedVeneerRequirementMessage() {
     return document.body.classList.contains("quick-panels-page")
       ? "Шпон толщиной 1,5 мм и более требует шпона с двух сторон."
-      : "Шпон толщиной 1,5 мм и более требует двух фанерованных сторон.";
+      : "Шпон толщиной 2 мм и более требует двух фанерованных сторон.";
   }
 
   function isQuickWallPanel() {
@@ -497,7 +497,12 @@
   }
 
   function requiresTwoFaceSides(thickness) {
-    return isQuickWallPanel() ? Number.isFinite(thickness) && thickness >= 2 - 0.001 : isAtLeastOnePointFive(thickness);
+    // В подробном расчёте шпон 1,5 мм допускает одну сторону с черновым
+    // шпоном на обороте или две лицевые стороны (Woodstock, 23.10).
+    if (isQuickWallPanel() || isDetailedPanelCalculation()) {
+      return Number.isFinite(thickness) && thickness >= 2 - 0.001;
+    }
+    return isAtLeastOnePointFive(thickness);
   }
 
   let quickWallPaperResetHint = "";
@@ -6178,7 +6183,7 @@
     const selectedRoughThickness = roughSideRequested ? selectedRoughBackThickness() : null;
     const sideThicknessCompatible = !otherSideRequested || sameConfirmedThickness(veneerThickness, sideBThickness);
     const roughSideCompatible = !roughSideRequested || (isExactlyOnePointFive(veneerThickness) && Number.isFinite(selectedRoughThickness) && selectedRoughThickness <= 1.5 + 0.001);
-    if (requiresTwoFaceSides(veneerThickness) && sides !== 2) warnings.push(document.body.classList.contains("quick-panels-page") ? twoSidedVeneerRequirementMessage() : "Шпон толщиной 1,5 мм и более требует двусторонней оклейки.");
+    if (requiresTwoFaceSides(veneerThickness) && sides !== 2) warnings.push(document.body.classList.contains("quick-panels-page") ? twoSidedVeneerRequirementMessage() : "Шпон толщиной 2 мм и более требует двусторонней оклейки.");
     if (otherSideRequested && isReadyShirt(selectedVeneerA || selectedVeneerAGroup) && !Number.isFinite(veneerThickness)) {
       warnings.push("Для выбора другого материала необходимо указать подтверждённую толщину готовой рубашки");
     } else if (otherSideRequested && otherSideMaterialForCompatibility && !sideThicknessCompatible) {
