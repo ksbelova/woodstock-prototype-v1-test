@@ -2002,6 +2002,7 @@
     clearPriceOverrides("veneer:A:");
     clearPriceOverrides("veneer:B:");
     clearPriceOverrides("mixmatch:");
+    clearPriceOverrides("mixmatch-material:");
     clearPriceOverrides("veneer-actual:");
     veneerAPriceAuto = true;
     veneerBPriceAuto = true;
@@ -2213,6 +2214,7 @@
     clearPriceOverrides("veneer:A:");
     clearPriceOverrides("veneer:B:");
     clearPriceOverrides("mixmatch:");
+    clearPriceOverrides("mixmatch-material:");
     clearPriceOverrides("veneer-actual:");
     veneerAPriceAuto = true;
     veneerBPriceAuto = true;
@@ -2704,7 +2706,10 @@
   function updateLayoutUI() {
     const layout = effectiveLayoutId();
     const layoutNeeded = needsLayoutSelection();
-    if (layout !== "mixmatch") clearPriceOverrides("mixmatch:");
+    if (layout !== "mixmatch") {
+      clearPriceOverrides("mixmatch:");
+      if (effectiveLayoutBId() !== "mixmatch") clearPriceOverrides("mixmatch-material:");
+    }
     clearPriceOverrides("veneer-actual:");
     syncVeneerCutUI(true);
     syncVeneerBCutUI(true);
@@ -2734,11 +2739,12 @@
       : "";
 
     const mixMatch = result?.mixMatchVeneerPricing;
-    const showMixMatch = layout === "mixmatch" && Boolean(mixMatch?.applies) && Number.isFinite(mixMatch?.actualVeneerAreaM2);
+    const detailedMixMatch = isDetailedPanelCalculation() ? (result?.veneerConsumptions || []).find(x => x.mixMatchControlled) : null;
+    const showMixMatch = detailedMixMatch ? Number.isFinite(detailedMixMatch.mixMatchMaterialAreaM2) : layout === "mixmatch" && Boolean(mixMatch?.applies) && Number.isFinite(mixMatch?.actualVeneerAreaM2);
     form.mixMatchWarning.classList.toggle("is-hidden", !showMixMatch);
-    form.mixMatchWarning.textContent = showMixMatch
-      ? `Для MixMatch заложено: ${round(mixMatch.actualVeneerAreaM2, 2)} м² шпона. Ориентир — минимум ${mixMatch.minimumPacks || 3} пачки; фактический объём можно скорректировать в блоке расчётных условий.`
-      : "";
+    form.mixMatchWarning.textContent = detailedMixMatch && showMixMatch
+      ? `MixMatch: для материала «${detailedMixMatch.materialName}» заложено ${round(detailedMixMatch.mixMatchMaterialAreaM2, 2)} м². Ориентир — 50 м² для трёх пачек; фактический объём уточняется в расчётных условиях.`
+      : showMixMatch ? `Для MixMatch заложено: ${round(mixMatch.actualVeneerAreaM2, 2)} м² шпона. Ориентир — минимум ${mixMatch.minimumPacks || 3} пачки; фактический объём можно скорректировать в блоке расчётных условий.` : "";
     syncVeneerInfoMessagesVisibility();
   }
 
@@ -4222,6 +4228,7 @@
       layoutId, surfaceCount: sideLayouts.filter(value => value === layoutId).length
     }));
     const rules = {
+      // Формат 2500×640: прирубка по 10 мм с обеих сторон (Назаров, 23.10).
       "2500x640": { usableLengthMm: 2500, usableWidthMm: 620 },
       ...(data?.meta?.multiVeneerUsableWidthBySheetFormatMm || {})
     };
@@ -4276,7 +4283,11 @@
 
   function calculate() {
     if (!data) return null;
-    if (isDetailedPanelCalculation()) priceAdjustmentOverrides.clear();
+    if (isDetailedPanelCalculation()) {
+      [...priceAdjustmentOverrides.keys()].forEach(key => {
+        if (!String(key).startsWith("mixmatch-material:")) priceAdjustmentOverrides.delete(key);
+      });
+    }
     capturePositionFinishStateFromDom();
     const warnings = [], breakdown = [], sizes = readSizeRows();
     sizes.forEach((size) => {
@@ -4943,9 +4954,15 @@
         group.contributions.forEach(contribution => { contribution.recommendedArea = recommendedVeneerAreaM2 * contribution.cleanArea / requiredVeneerAreaM2; contribution.row.veneerRecommendedB = contribution.recommendedArea; });
       }
       const fixedMixMatch = fixedMixMatchGroups.includes(group);
+      let mixMatchDetail = null;
       if (fixedMixMatch) {
         const materialArea = mixMatchMaterialAreas.get(materialIdentity(group.item));
-        recommendedVeneerAreaM2 = Math.max(50, materialArea) * requiredVeneerAreaM2 / materialArea;
+        const automaticArea = Math.max(num(data?.meta?.mixMatchDefaultVeneerAreaM2) || 50, materialArea);
+        const overrideId = `mixmatch-material:${materialIdentity(group.item)}`;
+        const changedManually = priceAdjustmentOverrides.has(overrideId);
+        const actualArea = changedManually ? num(priceAdjustmentOverrides.get(overrideId)) : automaticArea;
+        mixMatchDetail = { materialArea, automaticArea, overrideId, changedManually, actualArea };
+        recommendedVeneerAreaM2 = automaticArea * requiredVeneerAreaM2 / materialArea;
         group.contributions.forEach(entry => {
           entry.recommendedArea = recommendedVeneerAreaM2 * entry.cleanArea / requiredVeneerAreaM2;
           entry.row[entry.side === "B" ? "veneerRecommendedB" : "veneerRecommendedA"] = entry.recommendedArea;
@@ -4955,9 +4972,11 @@
         ? (recommendedVeneerAreaM2 / requiredVeneerAreaM2 - 1) * 100
         : null;
       const id = `veneer-actual:${group.key}`;
-      const actualVeneerAreaManual = !isDetailedPanelCalculation() && !fixedMixMatch && priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = fixedMixMatch ? mixMatchDetail.changedManually : !isDetailedPanelCalculation() && priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
-      const actualVeneerAreaM2 = actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
+      const actualVeneerAreaM2 = fixedMixMatch
+        ? (Number.isFinite(mixMatchDetail.actualArea) ? mixMatchDetail.actualArea * requiredVeneerAreaM2 / mixMatchDetail.materialArea : null)
+        : actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
       const complexLayoutMinimumApplies = ["diagonal45", "herringbone"].includes(group.which === "B" ? layoutB : layout) && Number.isFinite(recommendedVeneerAreaM2);
       const minimumActualVeneerAreaM2 = complexLayoutMinimumApplies ? recommendedVeneerAreaM2 : requiredVeneerAreaM2;
       const actualValid = Number.isFinite(actualVeneerAreaM2) && actualVeneerAreaM2 > 0 && actualVeneerAreaM2 + 1e-9 >= minimumActualVeneerAreaM2;
@@ -4991,13 +5010,16 @@
         which: group.which, sideKey: group.sideKey, sameAsA: group.sameAsA, pricingMode: group.pricingMode,
         requiredVeneerAreaM2, recommendedVeneerAreaM2, recommendedWastePercent,
         actualVeneerAreaM2, actualWasteAreaM2, actualWastePercent, actualVeneerAreaManual,
-        valid: actualValid, validationError, mixMatchControlled: fixedMixMatch, mixMatchMaterialAreaM2: fixedMixMatch ? Math.max(50, mixMatchMaterialAreas.get(materialIdentity(group.item))) : null, paidVeneerAreaM2: null, purchasedWholeSheets: null, materialCost: null
+        valid: actualValid, validationError, mixMatchControlled: fixedMixMatch, mixMatchMaterialAreaM2: fixedMixMatch ? mixMatchDetail.actualArea : null,
+        mixMatchAutomaticAreaM2: fixedMixMatch ? mixMatchDetail.automaticArea : null,
+        mixMatchRequiredAreaM2: fixedMixMatch ? mixMatchDetail.materialArea : null,
+        mixMatchOverrideId: fixedMixMatch ? mixMatchDetail.overrideId : null, paidVeneerAreaM2: null, purchasedWholeSheets: null, materialCost: null
       };
       veneerConsumptions.push(consumption);
       veneerWasteAdjustments.push(consumption);
     });
 
-    if (fixedMixMatchGroups.length) warnings.push("MixMatch: минимальная закупка — 50 м² на каждый материал (ориентир для трёх пачек). Одинаковый шпон на сторонах А и Б объединяется.");
+    if (fixedMixMatchGroups.length) warnings.push("MixMatch: для трёх пачек предварительно заложено 50 м² на материал; менеджер может скорректировать по фактической площади. Одинаковый материал объединяется.");
     veneerRequiredStandardA = itemResults.filter((row) => row.classificationId === "standard_request").reduce((sum, row) => sum + (row.veneerRequiredA || 0), 0);
     veneerRequiredStandardB = itemResults.filter((row) => row.classificationId === "standard_request").reduce((sum, row) => sum + (row.veneerRequiredB || 0), 0);
     veneerRequiredNonstandardA = itemResults.filter((row) => row.classificationId === "nonstandard").reduce((sum, row) => sum + (row.veneerRequiredA || 0), 0);
@@ -6847,8 +6869,8 @@
     form.priceAdjustmentsList.append(wrapper);
   }
 
-  function renderAreaAdjustmentControl({ id, name, automaticArea = null, area = null, note = "" }) {
-    if (isDetailedPanelCalculation()) return;
+  function renderAreaAdjustmentControl({ id, name, automaticArea = null, area = null, note = "", detailedAllowed = false, minimumArea = null }) {
+    if (isDetailedPanelCalculation() && !detailedAllowed) return;
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
@@ -6868,7 +6890,7 @@
     control.className = "inline-percent-control";
     const input = document.createElement("input");
     input.type = "number";
-    input.min = "0.01";
+    input.min = Number.isFinite(minimumArea) ? String(round(minimumArea, 2)) : "0.01";
     input.step = "0.01";
     input.value = Number.isFinite(area) ? String(round(area, 2)) : "";
     input.setAttribute("aria-label", `${name}, м²`);
@@ -6879,7 +6901,7 @@
 
     input.addEventListener("change", () => {
       const value = Number(input.value);
-      if (!Number.isFinite(value) || value <= 0) {
+      if (!Number.isFinite(value) || value <= 0 || (Number.isFinite(minimumArea) && value + 1e-9 < minimumArea)) {
         input.value = Number.isFinite(area) ? String(round(area, 2)) : "";
         return;
       }
@@ -7079,13 +7101,20 @@
       rowCount += 1;
     }
 
+    const renderedMixMatch = new Set();
     (result?.veneerConsumptions || []).forEach((consumption) => {
       if (consumption.mixMatchControlled) {
-        if (isDetailedPanelCalculation()) {
-          const note = document.createElement("p");
-          note.className = "field__note";
-          note.textContent = `MixMatch · ${consumption.materialName}: оплачивается ${round(consumption.mixMatchMaterialAreaM2, 2)} м² на материал. Минимум — 50 м² (ориентир для трёх пачек); одинаковый шпон на сторонах А и Б объединяется.`;
-          form.priceAdjustmentsList.append(note);
+        if (isDetailedPanelCalculation() && !renderedMixMatch.has(consumption.mixMatchOverrideId)) {
+          renderedMixMatch.add(consumption.mixMatchOverrideId);
+          renderAreaAdjustmentControl({
+            id: consumption.mixMatchOverrideId,
+            name: `MixMatch · ${consumption.materialName}`,
+            automaticArea: consumption.mixMatchAutomaticAreaM2,
+            area: consumption.mixMatchMaterialAreaM2,
+            minimumArea: consumption.mixMatchRequiredAreaM2,
+            detailedAllowed: true,
+            note: `Ориентир для трёх пачек — 50 м². Фактическую площадь можно уточнить, но она не должна быть меньше расчётной потребности ${round(consumption.mixMatchRequiredAreaM2, 2)} м².`
+          });
           rowCount += 1;
         }
         return;
