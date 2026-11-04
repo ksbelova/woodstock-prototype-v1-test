@@ -3153,9 +3153,11 @@
       </div>
 
       <label class="field is-hidden" data-size-manufacturing-field>
-        <span class="field__label">Тип изготовления</span>
+        <span class="field__label">${isDetailedPanelCalculation() ? "Тип изделия" : "Тип изготовления"}</span>
         <select data-size-manufacturing-type></select>
-        <span class="field__note is-hidden" data-size-allowance-note>Размер изготовления будет увеличен на 20 мм по длине и ширине — по 10 мм с каждой стороны. Чистовой пил выполняет клиент.</span>
+        ${isDetailedPanelCalculation()
+                  ? '<span class="field__note is-hidden" data-size-manufacturing-note></span>'
+                  : '<span class="field__note is-hidden" data-size-allowance-note>Размер изготовления будет увеличен на 20 мм по длине и ширине — по 10 мм с каждой стороны. Чистовой пил выполняет клиент.</span>'}
       </label>
 
       <select data-size-standard-order hidden aria-hidden="true">
@@ -3169,12 +3171,12 @@
 
       <div class="field-grid field-grid--size-row is-hidden" data-size-fields>
         <label class="field">
-          <span class="field__label">Длина, мм — направление волокон</span>
+          <span class="field__label" data-size-length-label>Длина, мм — направление волокон</span>
           <input data-size-length type="number" min="1" step="1" value="${esc(values.length || "")}" />
           <span class="field__error" data-size-length-error></span>
         </label>
         <label class="field">
-          <span class="field__label">Ширина, мм</span>
+          <span class="field__label" data-size-width-label>Ширина, мм</span>
           <input data-size-width type="number" min="1" step="1" value="${esc(values.width || "")}" />
           <span class="field__error" data-size-width-error></span>
         </label>
@@ -3184,6 +3186,8 @@
           <span class="field__error" data-size-quantity-error></span>
         </label>
       </div>
+
+      ${isDetailedPanelCalculation() ? '<p class="field__note is-hidden" data-size-calculated-result></p>' : ''}
 
       <div class="size-row__extra" data-size-extra>
         <label class="toggle-line">
@@ -3302,13 +3306,13 @@
     const current = preferred || select.value || manufacturingTypeForRow(row);
     const options = mode === "standard"
       ? [
-          { id: "standard", name: "Стандартная панель (полуфабрикат без чистового пила)" },
-          { id: "exact", name: "Готовая деталь (в точный размер)" }
+          { id: "standard", name: isDetailedPanelCalculation() ? "Стандартная панель" : "Стандартная панель (полуфабрикат без чистового пила)" },
+          { id: "exact", name: isDetailedPanelCalculation() ? "Деталь в чистовой размер" : "Готовая деталь (в точный размер)" }
         ]
       : mode === "custom"
         ? [
-            { id: "exact", name: "Готовая деталь (в точный размер)" },
-            { id: "allowance20", name: "С припуском +20 мм (полуфабрикат без чистового пила)" }
+            { id: "exact", name: isDetailedPanelCalculation() ? "Деталь в чистовой размер" : "Готовая деталь (в точный размер)" },
+            { id: "allowance20", name: isDetailedPanelCalculation() ? "Нестандартный полуфабрикат" : "С припуском +20 мм (полуфабрикат без чистового пила)" }
           ]
         : [];
 
@@ -3317,6 +3321,46 @@
     const fallback = mode === "standard" ? "standard" : mode === "custom" ? "exact" : "";
     select.value = allowed.has(current) ? current : fallback;
     syncLegacySizeFields(row);
+  }
+
+  function updateDetailedManufacturingDescription(row, mode, manufacturingType) {
+    const note = $('[data-size-manufacturing-note]', row);
+    const calculated = $('[data-size-calculated-result]', row);
+    const lengthLabel = $('[data-size-length-label]', row);
+    const widthLabel = $('[data-size-width-label]', row);
+    const descriptions = {
+      standard: "Панель выбранного стандартного формата без чистового распила. Если нужен точный размер, выберите «Деталь в чистовой размер».",
+      exact: "Чистовой распил выполняется на производстве по указанным размерам. Кромление и финишное покрытие выбираются отдельно.",
+      allowance20: "Укажите размер, который клиент хочет получить после собственного чистового распила. Для расчёта прибавляем по 20 мм к длине и ширине заготовки."
+    };
+    if (note) {
+      note.textContent = mode ? descriptions[manufacturingType] || "" : "";
+      note.classList.toggle("is-hidden", !note.textContent);
+    }
+    const standard = manufacturingType === "standard";
+    const allowance = manufacturingType === "allowance20";
+    if (lengthLabel) lengthLabel.textContent = standard
+      ? "Длина панели, мм — направление волокон"
+      : allowance ? "Желаемая длина детали, мм — направление волокон"
+      : "Чистовая длина детали, мм — направление волокон";
+    if (widthLabel) widthLabel.textContent = standard
+      ? "Ширина панели, мм"
+      : allowance ? "Желаемая ширина детали, мм"
+      : "Чистовая ширина детали, мм";
+    const length = num($('[data-size-length]', row)?.value);
+    const width = num($('[data-size-width]', row)?.value);
+    const hasDimensions = mode && Number.isFinite(length) && length > 0 && Number.isFinite(width) && width > 0;
+    let result = "";
+    if (hasDimensions && allowance) {
+      result = `Расчётный размер заготовки: ${length + 20} × ${width + 20} мм. Полуфабрикат без чистового распила: точные размеры и геометрия не гарантируются.`;
+    } else if (hasDimensions && mode === "standard" && manufacturingType === "exact") {
+      const source = standardSourceDimensions(row);
+      if (source) result = `Исходная стандартная панель: ${source.length} × ${source.width} мм. Чистовой размер детали: ${length} × ${width} мм.`;
+    }
+    if (calculated) {
+      calculated.textContent = result;
+      calculated.classList.toggle("is-hidden", !result);
+    }
   }
 
   function updateSizeRowAvailability(row) {
@@ -3329,6 +3373,7 @@
     fields?.classList.toggle("is-hidden", !mode);
     manufacturingField?.classList.toggle("is-hidden", !mode);
     allowanceNote?.classList.toggle("is-hidden", manufacturingType !== "allowance20");
+    if (isDetailedPanelCalculation()) updateDetailedManufacturingDescription(row, mode, manufacturingType);
     updateSizeTransitionUI(row);
   }
 
@@ -6517,8 +6562,8 @@
     const manufacturingType = manufacturingTypeForSize(size);
     if (!manufacturingType) return "—";
     if (manufacturingType === "standard") return "Стандартная панель";
-    if (manufacturingType === "allowance20") return "Нестандарт с припуском +20 мм";
-    return "Готовая деталь в точный размер";
+    if (manufacturingType === "allowance20") return isDetailedPanelCalculation() ? "Нестандартный полуфабрикат" : "Нестандарт с припуском +20 мм";
+    return isDetailedPanelCalculation() ? "Деталь в чистовой размер" : "Готовая деталь в точный размер";
   }
 
   function priceSourceForSpec(size, item = null) {
@@ -6744,7 +6789,9 @@
         specRow("Длина, мм", Number.isFinite(size.length) && size.length > 0 ? specNumber(size.length, 2) : "—"),
         specRow("Ширина, мм", Number.isFinite(size.width) && size.width > 0 ? specNumber(size.width, 2) : "—"),
         specRow("Количество, шт.", Number.isInteger(size.quantity) && size.quantity > 0 ? String(size.quantity) : "—"),
-        specRow("Тип изготовления", sizeTypeForSpec(size)),
+        specRow(isDetailedPanelCalculation() ? "Тип изделия" : "Тип изготовления", sizeTypeForSpec(size)),
+        ...(isDetailedPanelCalculation() && manufacturingTypeForSize(size) === "allowance20" && Number.isFinite(size.calcLength) && Number.isFinite(size.calcWidth)
+          ? [specRow("Расчётный размер заготовки, мм", `${size.calcLength} × ${size.calcWidth}`)] : []),
         specRow("Источник цены", priceSourceForSpec(size, item)),
         specRow("Площадь, м²", Number.isFinite(size.area) && size.area > 0 ? specNumber(size.area, 3) : "—"),
         specRow("Объём, м³", Number.isFinite(volume) ? specNumber(volume, 4) : "—"),
