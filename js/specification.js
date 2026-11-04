@@ -503,7 +503,11 @@
     if(editorController&&productType==='plate'){
       if(editorIndex!==null)rows=rows.filter(row=>!String(row[0]).startsWith(String(editorIndex+1)+'.')&&String(row[0])!==String(editorIndex+1));
       const edge=editorController.result()?.edge;
-      if(edge&&edge.mode!=='none')rows.push([editorIndex===null?'Новая позиция':String(editorIndex+1),'','','',n(edge.geometricMeters),n(edge.calculatedMeters),money(edge.pricePerRunningM),money(edge.materialCost),edge.operationPricingStatus==='included_in_production_quote'?'В стоимости производства':edge.operationPricingStatus==='not_required'?'Не требуется':money(edge.operationCost),'']);
+      if(edge&&edge.mode!=='none'){
+        // В отдельной кромке расчётный метраж по торцам может отличаться от вручную заказанного.
+        const metersToOrder=edge.mode==='separate'?(edge.orderedMeters??edge.meters??edge.calculatedMeters):edge.calculatedMeters;
+        rows.push([editorIndex===null?'Новая позиция':String(editorIndex+1),'','','',n(edge.geometricMeters),n(metersToOrder),money(edge.pricePerRunningM),money(edge.materialCost),edge.operationPricingStatus==='included_in_production_quote'?'В стоимости производства':edge.operationPricingStatus==='not_required'?'Не требуется':money(edge.operationCost),'']);
+      }
     }
     $('edgeSection').classList.toggle('is-hidden',!rows.length);if(!rows.length){$('edgeTable').innerHTML='';return;}
     const container=document.createElement('div');container.innerHTML=table([...edgeHeaders,'Действия'],rows);
