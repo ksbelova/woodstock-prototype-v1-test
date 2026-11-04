@@ -436,6 +436,24 @@
     return document.body.classList.contains("quick-panels-page") && document.body.dataset.panelScenario === "details";
   }
 
+  function syncDetailedPaperBack() {
+    if (!isDetailedPanelCalculation()) return;
+    const thickness = selectedVeneerThickness();
+    const base = parseThicknessComposition(currentBaseThicknessRaw()).total;
+    const allowed = faceMaterialSelectionReady()
+      && Math.abs(thickness - 0.6) < 0.001
+      && Number.isFinite(base) && base > 0 && base <= 10;
+    if (!allowed && form.reverseSideSelect.value === "paper") {
+      form.reverseSideSelect.value = "rough";
+    }
+    const option = form.reverseSideSelect.querySelector('option[value="paper"]');
+    if (option) option.disabled = !allowed;
+    form.reverseSideHint.textContent = faceMaterialSelectionReady() && !allowed
+      && Number(form.veneeredSidesSelect.value) === 1
+      ? "Бумага возможна только при шпоне 0,6 мм и основе до 10 мм. Обратная сторона — черновой шпон."
+      : "";
+  }
+
   let quickPaperBackResetHint = "";
 
   function syncQuickPaperBack() {
@@ -2633,6 +2651,7 @@
     form.veneerSideBGrid?.classList.toggle("is-hidden", !faceReady || two);
     syncQuickWallBack();
     syncQuickPaperBack();
+    syncDetailedPaperBack();
     if (!other) {
       clearTouchedFields("veneerB", "veneerBCut", "veneerBPrice", "veneerBCondition");
       selectedVeneerBGroup = null;
@@ -7602,6 +7621,7 @@
   function recalc() {
     syncQuickWallBack();
     syncQuickPaperBack();
+    syncDetailedPaperBack();
     syncQuickWallEdge();
     if (isQuickStandardPanel()) edgeWidthAutomatic.separate = true;
     syncEdgeWidthOptions("attached", { preserve: true });
