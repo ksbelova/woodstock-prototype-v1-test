@@ -4972,7 +4972,7 @@
         ? (recommendedVeneerAreaM2 / requiredVeneerAreaM2 - 1) * 100
         : null;
       const id = `veneer-actual:${group.key}`;
-      const actualVeneerAreaManual = fixedMixMatch ? mixMatchDetail.changedManually : !isDetailedPanelCalculation() && priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = fixedMixMatch ? mixMatchDetail.changedManually : priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
       const actualVeneerAreaM2 = fixedMixMatch
         ? (Number.isFinite(mixMatchDetail.actualArea) ? mixMatchDetail.actualArea * requiredVeneerAreaM2 / mixMatchDetail.materialArea : null)
@@ -5010,7 +5010,7 @@
         which: group.which, sideKey: group.sideKey, sameAsA: group.sameAsA, pricingMode: group.pricingMode,
         requiredVeneerAreaM2, recommendedVeneerAreaM2, recommendedWastePercent,
         actualVeneerAreaM2, actualWasteAreaM2, actualWastePercent, actualVeneerAreaManual,
-        valid: actualValid, validationError, mixMatchControlled: fixedMixMatch, mixMatchMaterialAreaM2: fixedMixMatch ? mixMatchDetail.actualArea : null,
+        valid: actualValid, validationError, minimumActualVeneerAreaM2, mixMatchControlled: fixedMixMatch, mixMatchMaterialAreaM2: fixedMixMatch ? mixMatchDetail.actualArea : null,
         mixMatchAutomaticAreaM2: fixedMixMatch ? mixMatchDetail.automaticArea : null,
         mixMatchRequiredAreaM2: fixedMixMatch ? mixMatchDetail.materialArea : null,
         mixMatchOverrideId: fixedMixMatch ? mixMatchDetail.overrideId : null, paidVeneerAreaM2: null, purchasedWholeSheets: null, materialCost: null
@@ -5314,14 +5314,21 @@
       const sideKey = group.sameAsA ? "A+B" : group.which;
       const consumptionKey = `standard-sheet:${materialIdentity(group.item)}:${sideKey}:${group.length}x${group.width}`;
       const id = `veneer-actual:${consumptionKey}`;
-      const actualVeneerAreaManual = !isDetailedPanelCalculation() && priceAdjustmentOverrides.has(id);
+      const actualVeneerAreaManual = priceAdjustmentOverrides.has(id);
       const storedActual = num(priceAdjustmentOverrides.get(id));
       const actualVeneerAreaM2 = actualVeneerAreaManual ? storedActual : recommendedVeneerAreaM2;
-      const valid = Number.isFinite(actualVeneerAreaM2) && actualVeneerAreaM2 > 0 && actualVeneerAreaM2 + 1e-9 >= requiredVeneerAreaM2;
+      // Для стандартизированного мультишпона полезный расход не может быть ниже
+      // технологической потребности; закупка всё равно кратна целым листам.
+      const minimumActualVeneerAreaM2 = fixedMultiPurchase && Number.isFinite(technicalSheets) && Number.isFinite(physicalSheetAreaM2)
+        ? Math.max(requiredVeneerAreaM2, technicalSheets * physicalSheetAreaM2)
+        : requiredVeneerAreaM2;
+      const valid = Number.isFinite(actualVeneerAreaM2) && actualVeneerAreaM2 > 0 && actualVeneerAreaM2 + 1e-9 >= minimumActualVeneerAreaM2;
       const validationError = !Number.isFinite(actualVeneerAreaM2)
         ? "Укажите фактическое количество шпона."
-        : actualVeneerAreaM2 <= 0 || actualVeneerAreaM2 + 1e-9 < requiredVeneerAreaM2
-          ? "Фактическое количество шпона не может быть меньше расчётной потребности"
+        : actualVeneerAreaM2 <= 0 || actualVeneerAreaM2 + 1e-9 < minimumActualVeneerAreaM2
+          ? (fixedMultiPurchase
+              ? `Для мультишпона технологически необходимо не менее ${round(minimumActualVeneerAreaM2, 3)} м² шпона.`
+              : "Фактическое количество шпона не может быть меньше расчётной потребности")
           : "";
       const actualWasteAreaM2 = Number.isFinite(actualVeneerAreaM2) ? actualVeneerAreaM2 - requiredVeneerAreaM2 : null;
       const actualWastePercent = Number.isFinite(actualWasteAreaM2) && requiredVeneerAreaM2 > 0
@@ -5329,7 +5336,10 @@
         : null;
       let requirement = { ...automaticRequirement, selectedActualAreaM2: Number.isFinite(actualVeneerAreaM2) ? actualVeneerAreaM2 : null };
       if (automaticRequirement?.exact && valid && Number.isFinite(physicalSheetAreaM2) && physicalSheetAreaM2 > 0) {
-        const purchasedSheets = Math.ceil(actualVeneerAreaM2 / physicalSheetAreaM2 - 1e-9);
+        const estimatedSheets = Math.ceil(actualVeneerAreaM2 / physicalSheetAreaM2 - 1e-9);
+        const purchasedSheets = fixedMultiPurchase
+          ? Math.max(automaticRequirement.purchasedSheets, estimatedSheets)
+          : estimatedSheets;
         requirement = { ...requirement, purchasedSheets, paidAreaM2: purchasedSheets * physicalSheetAreaM2 };
       }
       const linkedConsumptions = existingSpecificationItems().filter(record =>
@@ -5352,7 +5362,7 @@
         panelSize: { length: group.length, width: group.width },
         requiredVeneerAreaM2, recommendedVeneerAreaM2, recommendedWastePercent,
         actualVeneerAreaM2, actualWasteAreaM2, actualWastePercent, actualVeneerAreaManual,
-        valid, validationError, paidVeneerAreaM2: Number.isFinite(num(requirement.paidAreaM2)) ? num(requirement.paidAreaM2) : null,
+        valid, validationError, minimumActualVeneerAreaM2, paidVeneerAreaM2: Number.isFinite(num(requirement.paidAreaM2)) ? num(requirement.paidAreaM2) : null,
         purchasedWholeSheets: Number.isFinite(num(requirement.purchasedSheets)) ? num(requirement.purchasedSheets) : null, materialCost: null
       };
       if (!valid) {
@@ -6938,15 +6948,6 @@
 
   function renderVeneerWasteAdjustmentControl(consumption) {
     if (!consumption) return;
-    if (isDetailedPanelCalculation()) {
-      const summary = document.createElement("p");
-      summary.className = "field__note";
-      const area = Number.isFinite(consumption.actualVeneerAreaM2) ? round(consumption.actualVeneerAreaM2, 3) + " м²" : "не определён по имеющимся данным";
-      const waste = Number.isFinite(consumption.actualWastePercent) ? " · отход " + round(consumption.actualWastePercent, 1) + "%" : "";
-      summary.textContent = (consumption.materialName || "Шпон") + " · сторона " + (consumption.sideKey || consumption.which || "—") + ": расход " + area + waste + ". Рассчитывается автоматически.";
-      form.priceAdjustmentsList.append(summary);
-      return;
-    }
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
@@ -6959,10 +6960,11 @@
     label.textContent = `Фактическое количество шпона · ${sideLabel}`;
     const meta = document.createElement("span");
     meta.className = "adjustment-manual";
+    const precision = isDetailedPanelCalculation() ? 3 : 2;
     const recommendedText = Number.isFinite(consumption.recommendedVeneerAreaM2)
-      ? `${round(consumption.recommendedVeneerAreaM2, 2)} м² (${round(consumption.recommendedWastePercent, 1)}%)`
+      ? `${round(consumption.recommendedVeneerAreaM2, precision)} м² (${round(consumption.recommendedWastePercent, 1)}%)`
       : "не определён";
-    meta.textContent = `${consumption.materialName || "Шпон"} · ${contextLabel} · расчётная потребность ${round(consumption.requiredVeneerAreaM2, 2)} м² · рекомендуемый расход ${recommendedText}`;
+    meta.textContent = `${consumption.materialName || "Шпон"} · ${contextLabel} · расчётная потребность ${round(consumption.requiredVeneerAreaM2, precision)} м² · рекомендуемый расход ${recommendedText}`;
     label.append(document.createElement("br"), meta);
 
     const right = document.createElement("div");
@@ -6972,9 +6974,11 @@
     areaControl.className = "inline-percent-control";
     const areaInput = document.createElement("input");
     areaInput.type = "number";
-    areaInput.min = "0.01";
-    areaInput.step = "0.01";
-    areaInput.value = Number.isFinite(consumption.actualVeneerAreaM2) ? String(round(consumption.actualVeneerAreaM2, 2)) : "";
+    areaInput.min = isDetailedPanelCalculation() && Number.isFinite(consumption.minimumActualVeneerAreaM2)
+      ? String(Math.ceil(consumption.minimumActualVeneerAreaM2 * 1000 - 1e-9) / 1000)
+      : "0.01";
+    areaInput.step = isDetailedPanelCalculation() ? "0.001" : "0.01";
+    areaInput.value = Number.isFinite(consumption.actualVeneerAreaM2) ? String(round(consumption.actualVeneerAreaM2, precision)) : "";
     areaInput.setAttribute("aria-label", `Фактическое количество шпона, ${sideLabel}, м²`);
     const areaSign = document.createElement("strong");
     areaSign.textContent = "м²";
