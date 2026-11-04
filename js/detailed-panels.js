@@ -1715,8 +1715,11 @@
     const value = num(width);
     if (!Number.isFinite(value)) return false;
     if (isDetailedPanelCalculation()) {
+      // Для кромки, продаваемой отдельно, ширина не зависит от толщины плиты.
+      if (form.edgeModeSelect.value !== "attached") return value > 0;
+      // Рабочее правило из краткого расчёта: припуск 2 мм с каждой стороны.
       const thickness = detailedFinishedThicknessMm();
-      return Number.isFinite(thickness) && value > thickness;
+      return Number.isFinite(thickness) && value + 1e-9 >= thickness + 4;
     }
     const finished = quickPanelFinishedThicknessMm();
     return Number.isFinite(finished) ? value + 1e-9 >= finished + 4 : value > minimumAttachedEdgeWidth();
@@ -1789,9 +1792,11 @@
     if (!validationError && customOrder && Number.isFinite(manualOrderPricePerM2) && manualOrderPricePerM2 < 0) validationError = "Цена заказной кромки не может быть отрицательной.";
     if (!validationError && item?.orderedProgram && !catalogPriced) validationError = `Ширина заказной кромки должна быть от ${item.widthRangeMm.min} до ${item.widthRangeMm.max} мм.`;
     if (!validationError && isDetailedPanelCalculation() && which === "attached" && !Number.isFinite(detailedFinishedThicknessMm())) validationError = "Итоговая толщина изделия не определена: нужны подтверждённые толщины облицовки обеих сторон.";
-    if (!validationError && (which === "attached" || isQuickStandardPanel() && which === "separate") && Number.isFinite(width) && !edgeWidthFitsProduct(width)) validationError = Number.isFinite(quickPanelFinishedThicknessMm())
-      ? "Ширина кромки должна быть больше итоговой толщины изделия минимум на 4 мм."
-      : "Ширина кромки должна превышать толщину детали.";
+    if (!validationError && (which === "attached" || isQuickStandardPanel() && which === "separate") && Number.isFinite(width) && !edgeWidthFitsProduct(width)) validationError = isDetailedPanelCalculation()
+      ? "Ширина кромки для кромления должна превышать итоговую толщину изделия минимум на 4 мм."
+      : Number.isFinite(quickPanelFinishedThicknessMm())
+        ? "Ширина кромки должна превышать итоговую толщину изделия минимум на 4 мм."
+        : "Ширина кромки должна превышать толщину детали.";
 
     return {
       which,
@@ -1951,14 +1956,12 @@
       return false;
     }
 
-    setSeparateEdgeMetersError("");
-    if (value < data.meta.edgeSeparateMinimumRunningM) {
-      setSeparateEdgeMetersWarning(`Менее ${data.meta.edgeSeparateMinimumRunningM} пог. м: минимум пока не подтверждён на уровне одной позиции. Проверьте общий метраж заявки.`);
-    } else {
-      setSeparateEdgeMetersWarning("");
-    }
+    const minimum = separateEdgeMinimumMeters();
+    const valid = value >= minimum;
+    setSeparateEdgeMetersError(valid ? "" : `Минимальный заказ кромки — ${minimum} пог. м.`);
+    setSeparateEdgeMetersWarning("");
     recalc();
-    return true;
+    return valid;
   }
 
   function sizeRowSupportsAttachedEdge(row) {
@@ -3907,7 +3910,7 @@
   }
 
   function separateEdgeMinimumMeters() {
-    return isDetailedPanelCalculation() ? null : isQuickStandardPanel() ? 50 : num(data?.meta?.edgeSeparateMinimumRunningM);
+    return num(data?.meta?.edgeSeparateMinimumRunningM) ?? 50;
   }
 
   function separateEdgeAutomaticMeters() {
@@ -3931,14 +3934,10 @@
     form.separateEdgeMetersReset?.classList.toggle("is-hidden", !separateEdgeMetersManual);
     if (form.separateEdgeMetersSummary) form.separateEdgeMetersSummary.textContent =
       `${separateEdgeMetersManual ? "Ручная корректировка. " : ""}По размерам и выбранным торцам: ${round(meters, 2)} пог. м. Запас не добавлен.`;
-    if (isDetailedPanelCalculation()) {
-      setSeparateEdgeMetersWarning("Минимальный объём изготовления заказной кромки требует согласования.");
-      return;
-    }
     const selected = num(form.separateEdgeMetersInput.value);
     const minimum = separateEdgeMinimumMeters();
     setSeparateEdgeMetersWarning(Number.isFinite(selected) && selected > 0 && selected < minimum
-      ? `Менее ${minimum} пог. м: проверьте общий метраж заявки.` : "");
+      ? `Минимальный заказ кромки — ${minimum} пог. м.` : "");
   }
 
   function geometricEdgeMetersForSize(size, sidesId = form.edgeSidesSelect.value) {
@@ -5932,14 +5931,11 @@
         edge.validationError = "Укажите требуемый метраж отдельной кромки.";
         warnings.push(edge.validationError);
         hasPartialPrice = true;
-      } else if (isQuickStandardPanel() && meters < minMeters) {
+      } else if (Number.isFinite(minMeters) && meters < minMeters) {
         edge.valid = false;
-        edge.validationError = "Минимальный заказ кромки 50 пог. м";
+        edge.validationError = `Минимальный заказ кромки — ${minMeters} пог. м.`;
         warnings.push(edge.validationError);
         hasPartialPrice = true;
-      } else if (Number.isFinite(minMeters) && meters < minMeters) {
-        edge.minimumOrderWarning = `Менее ${minMeters} пог. м: минимум пока не подтверждён на уровне одной позиции; проверьте общий метраж заявки.`;
-        warnings.push(edge.minimumOrderWarning);
       }
 
       if (!selection.valid) {
@@ -7486,8 +7482,8 @@
         const minMeters = separateEdgeMinimumMeters();
         if (!Number.isFinite(meters) || meters <= 0) {
           add("separateEdgeMeters", "метраж отдельной кромки", form.separateEdgeMetersInput, "Укажите требуемый метраж отдельной кромки.", form.separateEdgeMetersError);
-        } else if (isQuickStandardPanel() && meters < minMeters) {
-          add("separateEdgeMeters", "метраж отдельной кромки", form.separateEdgeMetersInput, "Минимальный заказ кромки 50 пог. м", form.separateEdgeMetersError);
+        } else if (Number.isFinite(minMeters) && meters < minMeters) {
+          add("separateEdgeMeters", "метраж отдельной кромки", form.separateEdgeMetersInput, `Минимальный заказ кромки — ${minMeters} пог. м.`, form.separateEdgeMetersError);
         }
       }
       if (edgeMode === "attached") {
