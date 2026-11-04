@@ -3097,8 +3097,13 @@
     const limit = finishedDetailTechnologicalLimit(size);
     if (!limit) return { valid: true, limit: null };
 
-    const biggerSide = Math.max(Number(size.length) || 0, Number(size.width) || 0);
-    const smallerSide = Math.min(Number(size.length) || 0, Number(size.width) || 0);
+    // Нестандартный полуфабрикат проверяем по фактической заготовке с +20 мм,
+    // а готовую деталь и стандартную панель — по их собственному размеру.
+    const allowanceBlank = isDetailedPanelCalculation() && manufacturingTypeForSize(size) === "allowance20";
+    const limitLength = allowanceBlank ? size.calcLength : size.length;
+    const limitWidth = allowanceBlank ? size.calcWidth : size.width;
+    const biggerSide = Math.max(Number(limitLength) || 0, Number(limitWidth) || 0);
+    const smallerSide = Math.min(Number(limitLength) || 0, Number(limitWidth) || 0);
     const maxLength = num(limit.maxLengthMm);
     const maxWidth = num(limit.maxWidthMm);
     const valid = (!Number.isFinite(maxLength) || biggerSide <= maxLength) &&
@@ -3490,6 +3495,11 @@
       const calcWidth = allowance && width ? width + allowance : width;
       const productionAllowance = productionFitAllowanceMm(manufacturingType);
       const needsProductionFitCheck = ["exact", "allowance20"].includes(manufacturingType);
+      // После смены основы/толщины не превращаем прежний стандарт в готовую деталь.
+      const selectedStandardSource = mode === "standard" && manufacturingType === "exact"
+        ? standardSourceDimensions(row) : { length, width };
+      const standardSizeAvailable = !isDetailedPanelCalculation() || mode !== "standard" ||
+        Boolean(selectedStandardSource && isKnownStandardSize(selectedStandardSource));
       const fitKnown = needsProductionFitCheck && length > 0 && width > 0;
       const productionFitUnconfirmed = isDetailedPanelCalculation() && fitKnown &&
         (!productionSourceFormatsForBase().length || !sizeFitsProduction(length, width, productionAllowance));
@@ -3512,6 +3522,7 @@
         resultMode,
         physicalSizeValid,
         productionFitUnconfirmed,
+        standardSizeAvailable,
         calcLength,
         calcWidth,
         transition: !isQuickWallPanel() && !isQuickDetailsPanel() && !isQuickStandardPanel() && Boolean($('[data-size-transition]', row)?.checked),
@@ -3524,7 +3535,7 @@
       size.technologicalSizeValid = technologicalState.valid;
       size.technologicalSizeLimit = technologicalState.limit;
       size.minimumSizeValid = manufacturingType !== "exact" || !(length > 0 && width > 0) || (length >= 50 && width >= 50);
-      size.sizeValid = physicalSizeValid && technologicalState.valid && size.minimumSizeValid;
+      size.sizeValid = physicalSizeValid && technologicalState.valid && size.minimumSizeValid && standardSizeAvailable;
       size.area = length && width && quantity && size.sizeValid ? length * width * quantity / 1_000_000 : 0;
       size.calcArea = calcLength && calcWidth && quantity && size.sizeValid ? calcLength * calcWidth * quantity / 1_000_000 : 0;
       return size;
@@ -3619,7 +3630,10 @@
     }
 
     if (!pairs.length) {
-      target.innerHTML = "<span>Для выбранной толщины стандартные размеры не найдены</span>";
+      target.innerHTML = "<span>Для выбранной толщины стандартные размеры не найдены</span>" +
+        (isDetailedPanelCalculation() && row.dataset.sizeMode === "standard"
+          ? '<p class="field__error" role="alert">Выбранный ранее стандартный формат недоступен. Выберите другой формат или укажите свой размер.</p>'
+          : "");
       return;
     }
 
@@ -3632,7 +3646,9 @@
     const comparisonWidth = row.dataset.sizeMode === "standard" && manufacturingType === "exact" && Number.isFinite(sourceWidth) ? sourceWidth : currentWidth;
     const stillStandard = sizes.some((size) => size.length === comparisonLength && size.width === comparisonWidth);
 
-    if (row.dataset.sizeMode === "standard" && !stillStandard) {
+    if (row.dataset.sizeMode === "standard" && !stillStandard && !isDetailedPanelCalculation()) {
+      // В кратком расчёте оставляем прежнее поведение. В подробном расчёте
+      // не изменяем тип изделия без явного выбора менеджера.
       row.dataset.sizeMode = "custom";
       delete row.dataset.sourceStandardLength;
       delete row.dataset.sourceStandardWidth;
@@ -3642,7 +3658,10 @@
       updateSizeRowAvailability(row);
     }
 
-    target.innerHTML = pairs.map((size) => {
+    const unavailableStandardWarning = isDetailedPanelCalculation() && row.dataset.sizeMode === "standard" && !stillStandard
+      ? '<p class="field__error" role="alert">Выбранный ранее стандартный формат недоступен для текущей основы и толщины. Выберите другой стандартный формат или укажите свой размер. Параметры позиции сохранены.</p>'
+      : "";
+    target.innerHTML = unavailableStandardWarning + pairs.map((size) => {
       const active = row.dataset.sizeMode === "standard" &&
         comparisonLength === size.length &&
         comparisonWidth === size.width;
@@ -4354,15 +4373,19 @@
     const minimumSizeInvalidRows = sizes.filter(size => size.minimumSizeValid === false);
     const physicalSizeInvalidRows = sizes.filter((size) => size.physicalSizeValid === false);
     const technologicalSizeInvalidRows = sizes.filter((size) => size.physicalSizeValid !== false && size.technologicalSizeValid === false);
+    const unavailableStandardRows = sizes.filter((size) => size.standardSizeAvailable === false);
     const sizeValidation = {
-      valid: minimumSizeInvalidRows.length === 0 && incompleteSizeRows.length === 0 && quantityInvalidRows.length === 0 && transitionQuantityInvalidRows.length === 0 && transitionDescriptionInvalidRows.length === 0 && physicalSizeInvalidRows.length === 0 && technologicalSizeInvalidRows.length === 0,
+      valid: minimumSizeInvalidRows.length === 0 && unavailableStandardRows.length === 0 && incompleteSizeRows.length === 0 && quantityInvalidRows.length === 0 && transitionQuantityInvalidRows.length === 0 && transitionDescriptionInvalidRows.length === 0 && physicalSizeInvalidRows.length === 0 && technologicalSizeInvalidRows.length === 0,
       incompleteSizePositions: incompleteSizeRows.map((size) => size.position),
       quantityInvalidPositions: quantityInvalidRows.map((size) => size.position),
       transitionQuantityInvalidPositions: transitionQuantityInvalidRows.map((size) => size.position),
       transitionDescriptionInvalidPositions: transitionDescriptionInvalidRows.map((size) => size.position),
       physicalSizeInvalidPositions: physicalSizeInvalidRows.map((size) => size.position),
       technologicalSizeInvalidPositions: technologicalSizeInvalidRows.map((size) => size.position),
-      error: minimumSizeInvalidRows.length ? "Минимальный размер готовой детали — 50 мм по каждой стороне." : incompleteSizeRows.length
+      unavailableStandardPositions: unavailableStandardRows.map((size) => size.position),
+      error: minimumSizeInvalidRows.length ? "Минимальный размер готовой детали — 50 мм по каждой стороне." : unavailableStandardRows.length
+        ? `Позиции ${unavailableStandardRows.map((size) => size.position).join(", ")}: выбранный стандартный формат больше не доступен для текущей основы и толщины. Выберите другой формат или укажите свой размер.`
+        : incompleteSizeRows.length
         ? `Заполните длину, ширину и количество в позициях ${incompleteSizeRows.map((size) => size.position).join(", ")} или удалите эти позиции.`
         : quantityInvalidRows.length
         ? "Введите количество целым числом от 1."
@@ -4381,6 +4404,7 @@
                 })()
               : ""
     };
+    if (unavailableStandardRows.length) warnings.push(`Позиции ${unavailableStandardRows.map((size) => size.position).join(", ")}: выбранный стандартный формат больше не доступен. Тип изделия и введённые размеры сохранены; выберите другой стандартный формат или укажите свой размер.`);
     if (incompleteSizeRows.length) warnings.push(sizeValidation.error);
     if (quantityInvalidRows.length) warnings.push("Введите количество целым числом от 1.");
     if (transitionQuantityInvalidRows.length) warnings.push(transitionQuantityMessage());
