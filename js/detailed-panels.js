@@ -665,6 +665,7 @@
     const parts = [];
     if (isGloss100Finish(normalized)) {
       parts.push("Глянец 100%");
+      parts.push(finishOption(normalized.finishId)?.name || (isPolyurethaneLacquer(normalized.finishId) ? "Лак полиуретановый" : "Лак акриловый"));
     } else {
       const option = finishOption(normalized.finishId);
       parts.push(option?.name || "Финиш");
@@ -6542,6 +6543,7 @@
 
     if (isGloss100Finish(normalized)) {
       const rows = [specRow(label, "Глянец 100%", level)];
+      rows.push(specRow("Тип лака", finishOption(normalized.finishId)?.name || (isPolyurethaneLacquer(normalized.finishId) ? "Лак полиуретановый" : "Лак акриловый"), childLevel));
       rows.push(specRow("Стороны покрытия", normalized.sides || "—", childLevel));
       if (normalized.toning === "yes") rows.push(specRow("Тонировка", "Да", childLevel));
       if (normalized.isolator === "yes") rows.push(specRow("Изолятор", "Да", childLevel));
