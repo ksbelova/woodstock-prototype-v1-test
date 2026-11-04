@@ -4285,7 +4285,12 @@
     if (!data) return null;
     if (isDetailedPanelCalculation()) {
       [...priceAdjustmentOverrides.keys()].forEach(key => {
-        if (!String(key).startsWith("mixmatch-material:")) priceAdjustmentOverrides.delete(key);
+        // Расход шпона, скорректированный менеджером, должен переживать recalc().
+        // Остальные неподтверждённые корректировки сохраняют прежний порядок сброса.
+        const id = String(key);
+        if (!id.startsWith("mixmatch-material:") && !id.startsWith("veneer-actual:")) {
+          priceAdjustmentOverrides.delete(key);
+        }
       });
     }
     capturePositionFinishStateFromDom();
