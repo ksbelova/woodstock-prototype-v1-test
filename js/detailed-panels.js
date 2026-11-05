@@ -36,7 +36,7 @@
     retailPriceValue: el("retailPriceValue"), manualDiscountField: el("manualDiscountField"), manualDiscountInput: el("manualDiscountInput"), manualDiscountError: el("manualDiscountError"), finalPriceField: el("finalPriceField"), finalPriceValue: el("finalPriceValue"), finalPriceNote: el("finalPriceNote"), priceAdjustmentsBlock: el("priceAdjustmentsBlock"), priceAdjustmentsList: el("priceAdjustmentsList"),
 
     commentInput: el("commentInput"), filesInput: el("filesInput"), selectedFiles: el("selectedFiles"),
-    specCharacteristics: el("specCharacteristics"), specSizes: el("specSizes"), specPricePerM2Label: el("specPricePerM2Label"), specPricePerM2: el("specPricePerM2"), specPricePerPieceLabel: el("specPricePerPieceLabel"), specPricePerPiece: el("specPricePerPiece"), specTotal: el("specTotal"), specVat: el("specVat"), addToSpecButton: el("addToSpecButton"), saveStatus: el("saveStatus")
+    specCharacteristics: el("specCharacteristics"), specSizes: el("specSizes"), specPricePerM2Label: el("specPricePerM2Label"), specPricePerM2: el("specPricePerM2"), specPricePerPieceLabel: el("specPricePerPieceLabel"), specPricePerPiece: el("specPricePerPiece"), specTotal: el("specTotal"), specTotalLabel: el("specTotalLabel"), specPartialNote: el("specPartialNote"), specVat: el("specVat"), finalPriceLabel: el("finalPriceLabel"), addToSpecButton: el("addToSpecButton"), saveStatus: el("saveStatus")
   };
 
   let data = null;
@@ -6427,7 +6427,7 @@
     // Never force reconciliation if the original ledger is already inconsistent.
     const rawPositionTotalSum = itemResults.reduce((sum, item) => sum + (positionCostByRowId.get(item.rowId) || 0), 0);
     const rawLedgerReconciled = Math.abs(rawPositionTotalSum + orderLevelUnallocatedCost - finalTotal) <= 0.005;
-    if (isDetailedPanelCalculation() && window.WoodstockPanelsView?.positionPricing && rawLedgerReconciled) {
+    if (isDetailedPanelCalculation() && rawLedgerReconciled) {
       for (const [rowId, cost] of positionCostByRowId) positionCostByRowId.set(rowId, roundMoney(cost));
       orderLevelUnallocatedCost = roundMoney(orderLevelUnallocatedCost);
       const positionCents = itemResults.reduce((sum, item) => sum + moneyCents(positionCostByRowId.get(item.rowId) || 0), 0);
@@ -6862,20 +6862,30 @@
     const multiplePositions = (result.validSizes || []).length > 1;
     form.specPricePerM2Label.textContent = multiplePositions ? "Средняя цена за м² с НДС" : "Цена за м² с НДС";
     form.specPricePerPieceLabel.textContent = multiplePositions ? "Средняя цена за шт. / лист" : "Цена за шт. / лист";
-    if (result.priceCalculationComplete) {
+    const partialPrice = !result.priceCalculationComplete && isDetailedPanelCalculation()
+      && result.sizeValidation?.valid !== false && (result.validSizes || []).length > 0
+      && Number.isFinite(result.finalTotal) && roundMoney(result.finalTotal) > 0;
+    if (form.specTotalLabel) form.specTotalLabel.textContent = result.priceCalculationComplete ? "Итого с НДС" : "Стоимость рассчитанной части с НДС";
+    if (form.specPartialNote) {
+      const incomplete = !result.priceCalculationComplete && isDetailedPanelCalculation() && (result.validSizes || []).length > 0;
+      form.specPartialNote.classList.toggle("is-hidden", !incomplete);
+      form.specPartialNote.textContent = !incomplete ? "" : result.requiresProductionCost
+        ? "Стоимость производства пока не включена. Окончательную сумму уточним в общей спецификации."
+        : "Расчёт неполный: часть составляющих ещё не оценена. Окончательную сумму уточним в общей спецификации.";
+    }
+    if (result.priceCalculationComplete || partialPrice) {
       form.specPricePerM2.textContent = money(result.avgM2);
       form.specPricePerPiece.textContent = money(result.avgPiece);
       form.specTotal.textContent = money(result.finalTotal);
       form.specVat.textContent = `В том числе НДС 22%: ${money(result.vat)}`;
-    } else if (result.requiresProductionCost && !(isDetailedPanelCalculation() && result.sizeValidation?.valid === false)) {
-      form.specPricePerM2.textContent = "—";
-      form.specPricePerPiece.textContent = "—";
-      form.specTotal.textContent = "Требуется стоимость производства";
-      form.specVat.textContent = "В том числе НДС 22%: —";
+      if (partialPrice) {
+        form.specPricePerM2Label.textContent = multiplePositions ? "Средняя стоимость рассчитанной части за м² с НДС" : "Стоимость рассчитанной части за м² с НДС";
+        form.specPricePerPieceLabel.textContent = multiplePositions ? "Средняя стоимость рассчитанной части за шт. / лист" : "Стоимость рассчитанной части за шт. / лист";
+      }
     } else {
       form.specPricePerM2.textContent = "—";
       form.specPricePerPiece.textContent = "—";
-      form.specTotal.textContent = "—";
+      form.specTotal.textContent = result.requiresProductionCost && (result.validSizes || []).length > 0 ? "Уточняется" : "—";
       form.specVat.textContent = "В том числе НДС 22%: —";
     }
   }
@@ -7898,16 +7908,26 @@
     form.clientConditionNote.textContent = conditionNotes.join(" ");
     form.clientConditionNote.classList.toggle("is-hidden", conditionNotes.length === 0);
     setRowStatus(lastCalculation); renderTechOperations(lastCalculation); renderSpec(lastCalculation); renderPriceAdjustments(lastCalculation);
+    const partialKnownPrice = !lastCalculation.priceCalculationComplete && isDetailedPanelCalculation()
+      && lastCalculation.sizeValidation?.valid !== false && (lastCalculation.validSizes || []).length > 0
+      && Number.isFinite(lastCalculation.finalTotal) && roundMoney(lastCalculation.finalTotal) > 0;
+    if (form.finalPriceLabel) form.finalPriceLabel.textContent = partialKnownPrice ? "Рассчитанная часть, ₽/м²" : "Цена с учётом условий, ₽/м²";
     if (lastCalculation.priceCalculationComplete) {
       form.retailPriceValue.textContent = Number.isFinite(lastCalculation.retailAvgM2) ? money(lastCalculation.retailAvgM2) : "—";
       form.finalPriceValue.textContent = Number.isFinite(lastCalculation.avgM2) ? money(lastCalculation.avgM2) : "—";
       form.finalPriceNote.textContent = lastCalculation.manualDiscountApplied
         ? `Ручная скидка ${round(lastCalculation.manualDiscountPercent, 1)}% применена к розничной цене.`
         : "";
+    } else if (partialKnownPrice) {
+      form.retailPriceValue.textContent = "—";
+      form.finalPriceValue.textContent = Number.isFinite(lastCalculation.avgM2) ? money(lastCalculation.avgM2) : "—";
+      form.finalPriceNote.textContent = `Рассчитано: ${money(lastCalculation.finalTotal)} с НДС. ${lastCalculation.requiresProductionCost
+        ? "Стоимость производства ещё не включена."
+        : "Остальные составляющие пока не рассчитаны."} Окончательная стоимость — в общей спецификации.`;
     } else if (lastCalculation.requiresProductionCost && !(isDetailedPanelCalculation() && lastCalculation.sizeValidation?.valid === false)) {
       form.retailPriceValue.textContent = "—";
-      form.finalPriceValue.textContent = "Требуется стоимость производства";
-      form.finalPriceNote.textContent = "Окончательная стоимость определяется на общей странице спецификации.";
+      form.finalPriceValue.textContent = "Уточняется";
+      form.finalPriceNote.textContent = "Стоимость производства ещё не рассчитана. Окончательная сумма — в общей спецификации.";
     } else {
       form.retailPriceValue.textContent = "—";
       form.finalPriceValue.textContent = "—";
