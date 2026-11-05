@@ -57,7 +57,11 @@
   function materialParts(record){
     return (record.specification?.breakdown||[]).filter(item=>/^(Шпон|Чернов|Бумага|Готовая рубашка|Кромка(?: отдельно)? — материал)/.test(item.label));
   }
-  function materialKnown(record){const cents=materialParts(record).reduce((sum,item)=>sum+(Number.isFinite(item.value)?moneyCents(item.value):0),0)+moneyCents(edgeDiscount(record).delta);return cents/100;}
+  function materialKnown(record){
+    const subtotal = materialParts(record).reduce((sum, item) =>
+      sum + (Number.isFinite(item.value) ? item.value : 0), 0);
+    return roundMoney(subtotal + edgeDiscount(record).delta);
+  }
   function materialsComplete(record){
     if(record.sizes?.some(row=>row.productionFitStatus==='unconfirmed'))return false;
     const missing=(record.sizes||[]).flatMap(row=>row.pendingCosts||[]).filter(reason=>!productionReason(reason));

@@ -4430,7 +4430,6 @@
       const limit = size.technologicalSizeLimit;
       warnings.push(`Позиция ${size.position}: ${isDetailedPanelCalculation() ? (manufacturingTypeForSize(size) === "exact" ? "чистовая деталь" : "полуфабрикат") : "нестандартная готовая деталь со шлифовкой, лаком и кромкой"} при толщине ${String(parseThicknessComposition(currentBaseThicknessRaw()).total).replace(".", ",")} мм — ${technologicalLimitDescription(limit)}.`);
     });
-    if (isDetailedPanelCalculation() && form.edgeModeSelect.value === "separate") warnings.push("Минимальный объём изготовления заказной кромки требует согласования.");
     const validSizes = sizes.filter((x) => x.sizeValid && x.length > 0 && x.width > 0 && x.quantityValid);
     if (isDetailedPanelCalculation() && validSizes.length) {
       const sideCount = Number(form.veneeredSidesSelect.value);
@@ -4606,7 +4605,7 @@
           standard, size, quantity: size.quantity, mdfVolumeId, condition,
           discountKey, ...p
         });
-        breakdown.push({ label: `Складской стандарт ${size.length}×${size.width}`, value: finalCost, note: p.conditionUnresolved ? `Цена условия «${clientConditionUiName(condition)}» отсутствует — розничная цена не подставлена.` : `${money(p.finalSheet)}/лист × ${size.quantity}. Цена за м² рассчитывается из цены за лист.` });
+        breakdown.push({ label: `Складской стандарт ${size.length}×${size.width}`, value: finalCost, note: p.conditionUnresolved ? `Цена условия «${clientConditionUiName(condition)}» отсутствует — розничная цена не подставлена.` : `${money(p.finalSheet)}/лист × ${size.quantity}. Сумма рассчитывается по цене за лист.` });
         addPositionCost(size, finalCost);
         itemResults.push({ ...size, standard: true, classificationId: classification.id, classificationName: classification.name, standardItem: standard, retailCost, finalCost, veneerRequiredA: 0, veneerRequiredB: 0, veneerWastePercent: null, weight, transitionCoefficient: null, transitionCoefficientApplied: null });
         return;
@@ -5928,6 +5927,9 @@
       const meters = num(form.separateEdgeMetersInput.value);
       const orderEdgeMeters = Number.isFinite(meters) && meters > 0 ? meters : 0;
       const selection = edgeSelectionState("separate", { orderRunningM: orderEdgeMeters });
+      if (isDetailedPanelCalculation() && (selection.orderedProgram || selection.customOrder)) {
+        warnings.push("Минимальный объём изготовления заказной кромки требует согласования.");
+      }
       edge = {
         ...edge,
         ...selection,
@@ -6538,7 +6540,15 @@
       pricingStatus: roughBackPricingStatus === "not_required" ? "requires_clarification" : roughBackPricingStatus,
       source: roughBackOneMmTemporaryRateApplies() ? "temporary_team_rate_1mm_as_1_5mm_440_rub_m2" : "meta.roughBackVeneerRatesPerM2ByThickness"
     } : null;
-    return { base, thickness, sizes, validSizes, itemResults, productionCosts, totalArea, totalProductionArea, totalPieces, retailTotal, retailAvgM2: totalArea > 0 ? retailTotal / totalArea : null, automaticFinalTotal, finalTotal, manualDiscountPercent, manualDiscountCandidateTotal, manualDiscountApplied, vat, avgM2: totalArea > 0 ? finalTotal / totalArea : null, avgPiece: totalPieces > 0 ? finalTotal / totalPieces : null, totalWeight, warnings: [...new Set(warnings)], breakdown, hasPartialPrice, priceCalculationComplete, allStandard, attachedEdgeMeters, edge, edgeComment, orderLevelUnallocatedCost, positionPricingReconciled, mdfVolumeId, herringbone, customLayout, veneerPricings, readyShirtPricings, mdfPricings, baseRatePricings, veneerWasteAdjustments, veneerConsumptions, standardFinalSubtotal, standardRequestFinalSubtotal, nonstandardFinalSubtotal, roughBackVeneer, techOperations, finishResults, requiresBaseProductionCost, requiresLayoutProductionCost, requiresAllowanceProductionCost, requiresReadyShirtProductionCost, requiresFinishProductionCost, requiresOperationProductionCost, requiresProductionCost, thickVeneerWorkAdjustment, mixMatchVeneerPricing, layoutValidation, sizeValidation };
+    let retailAvgM2 = totalArea > 0 ? retailTotal / totalArea : null;
+    if (isDetailedPanelCalculation() && totalArea > 0 && mdfPricings.length === validSizes.length
+        && mdfPricings.every(({ standard }) => Number.isFinite(standard.pricesPerM2?.retail))) {
+      const sheetSubtotal = mdfPricings.reduce((sum, row) => sum + row.retailSheet * row.quantity, 0);
+      if (roundMoney(sheetSubtotal) === roundMoney(retailTotal)) {
+        retailAvgM2 = mdfPricings.reduce((sum, row) => sum + row.standard.pricesPerM2.retail * row.size.area, 0) / totalArea;
+      }
+    }
+    return { base, thickness, sizes, validSizes, itemResults, productionCosts, totalArea, totalProductionArea, totalPieces, retailTotal, retailAvgM2, automaticFinalTotal, finalTotal, manualDiscountPercent, manualDiscountCandidateTotal, manualDiscountApplied, vat, avgM2: totalArea > 0 ? finalTotal / totalArea : null, avgPiece: totalPieces > 0 ? finalTotal / totalPieces : null, totalWeight, warnings: [...new Set(warnings)], breakdown, hasPartialPrice, priceCalculationComplete, allStandard, attachedEdgeMeters, edge, edgeComment, orderLevelUnallocatedCost, positionPricingReconciled, mdfVolumeId, herringbone, customLayout, veneerPricings, readyShirtPricings, mdfPricings, baseRatePricings, veneerWasteAdjustments, veneerConsumptions, standardFinalSubtotal, standardRequestFinalSubtotal, nonstandardFinalSubtotal, roughBackVeneer, techOperations, finishResults, requiresBaseProductionCost, requiresLayoutProductionCost, requiresAllowanceProductionCost, requiresReadyShirtProductionCost, requiresFinishProductionCost, requiresOperationProductionCost, requiresProductionCost, thickVeneerWorkAdjustment, mixMatchVeneerPricing, layoutValidation, sizeValidation };
   }
 
   function specRow(label, value, level = 0) {
