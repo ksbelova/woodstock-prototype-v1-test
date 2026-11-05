@@ -55,7 +55,7 @@
   function inProduction(record){return productionScope().some(item=>item.id===record.id);}
   function effectiveWarnings(record){return inProduction(record)&&quoteState().valid&&materialsComplete(record)?(record.warnings||[]).filter(note=>!/ставк|стоимость.*производ|цен.*производ|производственн.*сумм|производственн.*стоим/i.test(note)):(record.warnings||[]);}
   function materialParts(record){
-    return (record.specification?.breakdown||[]).filter(item=>/^(Шпон|Чернов|Бумага|Готовая рубашка|Кромка — материал)/.test(item.label));
+    return (record.specification?.breakdown||[]).filter(item=>/^(Шпон|Чернов|Бумага|Готовая рубашка|Кромка(?: отдельно)? — материал)/.test(item.label));
   }
   function materialKnown(record){const cents=materialParts(record).reduce((sum,item)=>sum+(Number.isFinite(item.value)?moneyCents(item.value):0),0)+moneyCents(edgeDiscount(record).delta);return cents/100;}
   function materialsComplete(record){
