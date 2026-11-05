@@ -6373,7 +6373,11 @@
         if (manufacturingCostFromProduction(item)) markPositionPending(item, "Стоимость производства");
         if (thickVeneerWorkAdjustment.applies && isExactFinishedDetail(item) && !Number.isFinite(thickVeneerWorkAdjustment.actualCoefficient)) markPositionPending(item, "Работа с толстым шпоном");
         if (sameFaceSelectionOnBack && backsideCategoryBRequired(selectedVeneerA) && !faceVeneerBItem && item.classificationId !== "warehouse_standard") markPositionPending(item, "Шпон оборотной стороны");
-        if (calibrationEnabled && !["calculated", "included_in_panel_price", "not_required"].includes(calibrationPricingStatus)) markPositionPending(item, "Калибровка: стоимость уточняет производство");
+        if (calibrationEnabled &&
+            !["calculated", "included_in_panel_price", "not_required"].includes(calibrationPricingStatus) &&
+            (calibrationPricingStatus !== "calculated_and_pending_production" || manufacturingCostFromProduction(item))) {
+          markPositionPending(item, "Калибровка: стоимость уточняет производство");
+        }
         const finish = finishResults.find(entry => entry.rowId === item.rowId);
         if (finish && (finish.totalFinishCost === null || finish.requiresProductionCost || [finish.toningPricingStatus,finish.isolatorPricingStatus].some(status => /pending|incomplete/.test(status || "")))) markPositionPending(item, "Финишное покрытие");
       });
