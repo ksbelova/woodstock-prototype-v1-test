@@ -5,6 +5,9 @@
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const n=value=>Number.isFinite(value)?new Intl.NumberFormat('ru-RU',{maximumFractionDigits:4}).format(value):'—';
   const money=value=>Number.isFinite(value)?new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(value):'Уточняется';
+  // Each displayed monetary line is rounded to kopecks before order summation.
+  const moneyCents=value=>Math.round((value+Math.sign(value)*Number.EPSILON*Math.max(1,Math.abs(value)))*100);
+  const roundMoney=value=>Number.isFinite(value)?moneyCents(value)/100:null;
   const join=values=>values.filter(value=>value!==undefined&&value!==null&&value!=='').join('\n');
   const uid=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():'position_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   const metadataKey='woodstockDetailedOrder';
@@ -24,7 +27,7 @@
     try{sessionStorage.setItem(metadataKey,JSON.stringify(next));order=next;renderExtras();}catch(error){status('Не удалось сохранить данные заказа: '+error.message);}
   }
   function services(){return [...(order.packagingSelect?['Упаковка: '+order.packagingSelect]:[]),...Object.entries(serviceNames).filter(([id])=>order[id]).map(([,label])=>label)];}
-  function known(record){if(inProduction(record))return materialKnown(record);if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){const live=editorController.result?.();const value=live?.finalTotal??live?.total??null;return partial(record)&&value===0?null:value;}const value=Number.isFinite(record.specification?.knownTotal)?record.specification.knownTotal:Number.isFinite(record.total)?record.total:null;return partial(record)&&value===0?null:(Number.isFinite(value)?value+edgeDiscount(record).delta:value);}
+  function known(record){if(inProduction(record))return materialKnown(record);if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){const live=editorController.result?.();const value=live?.finalTotal??live?.total??null;return partial(record)&&value===0?null:roundMoney(value);}const value=Number.isFinite(record.specification?.knownTotal)?record.specification.knownTotal:Number.isFinite(record.total)?record.total:null;return partial(record)&&value===0?null:(Number.isFinite(value)?roundMoney(value+edgeDiscount(record).delta):value);}
   function partial(record){if(record.sizes?.some(row=>row.productionFitStatus==='unconfirmed'))return true;if(inProduction(record))return !quoteState().valid||!materialsComplete(record);if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){const live=editorController.result?.();return !live||(productType==='plate'?!live.priceCalculationComplete:!Number.isFinite(live.total));}return record.pricingPartial===true||!Number.isFinite(record.total);}
     // Production quote belongs to the order and is never allocated to individual rows.
   const productionReason = reason => /^(Стоимость производства|Основа и производственные операции|Работа с толстым шпоном|Операция кромления:|Калибровка:|Фаска:|Финишное покрытие)/.test(reason);
@@ -39,7 +42,7 @@
   function materialParts(record){
     return (record.specification?.breakdown||[]).filter(item=>/^(Шпон|Чернов|Бумага|Готовая рубашка|Кромка — материал)/.test(item.label));
   }
-  function materialKnown(record){return materialParts(record).reduce((sum,item)=>sum+(Number.isFinite(item.value)?item.value:0),0)+edgeDiscount(record).delta;}
+  function materialKnown(record){const cents=materialParts(record).reduce((sum,item)=>sum+(Number.isFinite(item.value)?moneyCents(item.value):0),0)+moneyCents(edgeDiscount(record).delta);return cents/100;}
   function materialsComplete(record){
     if(record.sizes?.some(row=>row.productionFitStatus==='unconfirmed'))return false;
     const missing=(record.sizes||[]).flatMap(row=>row.pendingCosts||[]).filter(reason=>!productionReason(reason));
@@ -60,7 +63,7 @@
   function quoteState(){
     const scope=productionScope(),quote=order.productionQuote;
     const valid=scope.length>0&&!!quote&&quote.signature===quoteSignature()&&quote.cost>0&&quote.markup>=0&&Number.isSafeInteger(Math.round(quote.cost*100))&&Number.isSafeInteger(Math.round(quote.cost*(1+quote.markup/100)*100));
-    return {scope,valid,stale:!!quote&&!valid,cost:valid?quote.cost:null,markup:valid?quote.markup:null,clientCost:valid?quote.cost*(1+quote.markup/100):null};
+    return {scope,valid,stale:!!quote&&!valid,cost:valid?quote.cost:null,markup:valid?quote.markup:null,clientCost:valid?roundMoney(quote.cost*(1+quote.markup/100)):null};
   }
   function renderProduction(){
     const section=$('productionSection');if(!section)return;
@@ -98,7 +101,7 @@
         (range.maxRunningM===null||range.maxRunningM===undefined||(range.maxExclusive?total<range.maxRunningM:total<=range.maxRunningM)));
       const volume=range?entry.levels?.[range.id]:null;
       const rate=entry.catalog&&Number.isFinite(volume)&&Number.isFinite(entry.originalRate)?Math.min(volume,entry.originalRate):entry.originalRate;
-      return {...entry,rate,total,condition:rate<entry.originalRate?range:null,delta:Number.isFinite(rate)&&Number.isFinite(entry.originalRate)?entry.meters*(rate-entry.originalRate):0};
+      return {...entry,rate,total,condition:rate<entry.originalRate?range:null,delta:Number.isFinite(rate)&&Number.isFinite(entry.originalRate)?roundMoney(entry.meters*(rate-entry.originalRate)):0};
     });
     return {entries,delta:entries.reduce((sum,entry)=>sum+entry.delta,0)};
   }
@@ -121,11 +124,17 @@
   function totals(){
     const values=records.map(known).filter(Number.isFinite);
     const quote=quoteState();
-    const total=values.reduce((sum,value)=>sum+value,0)+(quote.valid?quote.clientCost:0);
+    // Sum only already rounded order lines in integer kopecks.
+    const cents=values.reduce((sum,value)=>sum+moneyCents(value),0)+(quote.valid?moneyCents(quote.clientCost):0);
+    const hasKnownAmount=values.length>0||quote.valid;
+    const total=hasKnownAmount?cents/100:null;
     const vats=records.map((record,index)=>editorController&&index===editorIndex?(editorController.result?.()?.vat??null):record.specification?.knownVat??record.vat);
-    // Use VAT supplied by the original calculators. Unknown amounts are never replaced by zero.
-    const vat=productType==='plate'?(values.length?total*0.22/1.22:null):records.length&&values.length===records.length&&vats.every(Number.isFinite)?vats.reduce((sum,value)=>sum+value,0):null;
-    return {total:values.length?total:null,vat,partial:records.some(partial)||services().length>0};
+    // VAT is included in the rounded gross total, not added on top.
+    const vat=productType==='plate'
+      ? (hasKnownAmount?roundMoney(total*0.22/1.22):null)
+      : records.length&&values.length===records.length&&vats.every(Number.isFinite)
+        ? roundMoney(vats.reduce((sum,value)=>sum+value,0)):null;
+    return {total,vat,partial:records.some(partial)||services().length>0};
   }
   function table(headers,rows,classes=''){
     return '<div class="spec-table-wrap"><table class="spec-table '+classes+'"><thead><tr>'+headers.map(value=>'<th scope="col">'+esc(value)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(value=>'<td>'+esc(value??'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
