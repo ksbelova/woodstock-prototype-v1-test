@@ -447,7 +447,7 @@
           </label>
 
           <div class="price-reference price-reference--result" id="finalPriceField">
-            <span>Цена с учётом условий, ₽/м²</span>
+            <span id="finalPriceLabel">Цена с учётом условий, ₽/м²</span>
             <strong id="finalPriceValue">—</strong>
             <small id="finalPriceNote"></small>
           </div>
@@ -495,7 +495,8 @@
                 <div><dt id="specPricePerM2Label">Цена за м² с НДС</dt><dd id="specPricePerM2">—</dd></div>
                 <div><dt id="specPricePerPieceLabel">Цена за шт. / лист</dt><dd id="specPricePerPiece">—</dd></div>
               </dl>
-              <div class="total-box"><span>Итого с НДС</span><strong id="specTotal">—</strong><small id="specVat">В том числе НДС 22%: —</small></div>
+              <div class="total-box"><span id="specTotalLabel">Итого с НДС</span><strong id="specTotal">—</strong><small id="specVat">В том числе НДС 22%: —</small></div>
+              <p id="specPartialNote" class="field__note is-hidden"></p>
             </section>
           </div>
           <button class="next-step-button" id="addToSpecButton" type="button">Добавить в спецификацию</button>
