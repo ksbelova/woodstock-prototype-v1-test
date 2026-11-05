@@ -2452,9 +2452,13 @@
 
     if (form.calibrationDepthNote) {
       const rate = calibrationRatePerM2PerMm();
-      form.calibrationDepthNote.textContent = Number.isFinite(rate)
-        ? `Рассчитывается автоматически: исходная толщина основы − толщина после калибровки. Тариф ${money(rate)}/м² за каждый 1 мм съёма.`
-        : "Рассчитывается автоматически: исходная толщина основы − толщина после калибровки.";
+      const requiresProductionPrice = isDetailedPanelCalculation() &&
+        (operationPriceComesFromProduction(base) || selectedBasePriceMode() === "production");
+      form.calibrationDepthNote.textContent = requiresProductionPrice
+        ? "Рассчитывается автоматически: исходная толщина основы − толщина после калибровки. Стоимость калибровки уточняется производством."
+        : Number.isFinite(rate)
+          ? `Рассчитывается автоматически: исходная толщина основы − толщина после калибровки. Тариф ${money(rate)}/м² за каждый 1 мм съёма.`
+          : "Рассчитывается автоматически: исходная толщина основы − толщина после калибровки.";
     }
   }
 
@@ -6044,19 +6048,21 @@
         const nonstandardArea = calibrationSizes.filter((x) => classifySize(x).id === "nonstandard").reduce((sum, x) => sum + (x.calcArea || x.area), 0);
         const operationArea = warehouseArea + requestArea + nonstandardArea;
         calibrationArea = operationArea;
-        calibrationCost = operationArea * calibrationRatePerM2;
+        calibrationCost = operationArea > 0 ? operationArea * calibrationRatePerM2 : calibrationProductionArea > 0 && isDetailedPanelCalculation() ? null : 0;
         calibrationPricingStatus = calibrationProductionArea > 0 ? (operationArea > 0 ? "calculated_and_pending_production" : "pending_production") : "calculated";
-        retailTotal += calibrationCost;
-        finalTotal += calibrationCost;
-        calibrationSizes.forEach((size) => addPositionCost(size, (size.calcArea || size.area) * calibrationRatePerM2));
-        standardFinalSubtotal += warehouseArea * calibrationRatePerM2;
-        standardRequestFinalSubtotal += requestArea * calibrationRatePerM2;
-        nonstandardFinalSubtotal += nonstandardArea * calibrationRatePerM2;
-        breakdown.push({
-          label: "Калибровка основы",
-          value: calibrationCost,
-          note: `${specNumber(calibrationSourceBaseThicknessMm, 2)} → ${specNumber(baseThicknessAfterCalibrationMm, 2)} мм · съём ${specNumber(calibrationDepth, 2)} мм · ${money(calibrationRatePerM2PerMm)}/м² за 1 мм · итоговая ставка ${money(calibrationRatePerM2)}/м².`
-        });
+        if (operationArea > 0) {
+          retailTotal += calibrationCost;
+          finalTotal += calibrationCost;
+          calibrationSizes.forEach((size) => addPositionCost(size, (size.calcArea || size.area) * calibrationRatePerM2));
+          standardFinalSubtotal += warehouseArea * calibrationRatePerM2;
+          standardRequestFinalSubtotal += requestArea * calibrationRatePerM2;
+          nonstandardFinalSubtotal += nonstandardArea * calibrationRatePerM2;
+          breakdown.push({
+            label: "Калибровка основы",
+            value: calibrationCost,
+            note: `${specNumber(calibrationSourceBaseThicknessMm, 2)} → ${specNumber(baseThicknessAfterCalibrationMm, 2)} мм · съём ${specNumber(calibrationDepth, 2)} мм · ${money(calibrationRatePerM2PerMm)}/м² за 1 мм · итоговая ставка ${money(calibrationRatePerM2)}/м².`
+          });
+        }
       }
     }
 
@@ -7314,8 +7320,13 @@
       const sourceText = Number.isFinite(tech.calibrationSourceBaseThicknessMm) ? String(tech.calibrationSourceBaseThicknessMm).replace(".", ",") : "—";
       const afterText = Number.isFinite(tech.baseThicknessAfterCalibrationMm) ? String(tech.baseThicknessAfterCalibrationMm).replace(".", ",") : "—";
       const depthText = Number.isFinite(tech.calibrationDepth) ? `съём ${String(tech.calibrationDepth).replace(".", ",")} мм` : "съём не рассчитан";
-      const rateText = Number.isFinite(tech.calibrationRatePerM2) ? `${money(tech.calibrationRatePerM2)}/м²` : "ставка не рассчитана";
-      const costText = Number.isFinite(tech.calibrationCost) ? money(tech.calibrationCost) : "стоимость не рассчитана";
+      const productionOnly = isDetailedPanelCalculation() && tech.calibrationPricingStatus === "pending_production";
+      const mixedProduction = isDetailedPanelCalculation() && tech.calibrationPricingStatus === "calculated_and_pending_production";
+      const rateText = productionOnly ? "тариф уточняется производством"
+        : Number.isFinite(tech.calibrationRatePerM2) ? `${money(tech.calibrationRatePerM2)}/м²` : "ставка не рассчитана";
+      const costText = productionOnly ? "стоимость уточняется производством"
+        : mixedProduction ? `${money(tech.calibrationCost)} по рассчитанным позициям · остальные — стоимость производства`
+          : Number.isFinite(tech.calibrationCost) ? money(tech.calibrationCost) : "стоимость не рассчитана";
       const finishedText = Number.isFinite(tech.calibrationFinishedProductThicknessMm)
         ? ` · итог изделия ${String(tech.calibrationFinishedProductThicknessMm).replace(".", ",")} мм`
         : "";
@@ -9128,6 +9139,11 @@
     form.baseThicknessSelect.addEventListener("change", () => {
       markFieldTouched("baseThickness");
       clearTouchedFields("calibration", "calibrationTarget");
+      if (isDetailedPanelCalculation()) {
+        form.calibrationTargetInput.value = "";
+        if (form.calibrationDepthInput) form.calibrationDepthInput.value = "";
+        clearValidationFor(form.calibrationTargetInput, "calibrationTarget", form.calibrationTargetError);
+      }
       updateBaseProductionCostHint();
       updateThicknessWarnings();
       updateEdgeUI();
