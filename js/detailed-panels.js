@@ -117,6 +117,9 @@
   const num = Core.parseNumber;
   const round = Core.round;
   const money = Core.formatMoney;
+  // Round only monetary line totals; quantities, areas and pricing formulas keep full precision.
+  const moneyCents = value => Math.round((value + Math.sign(value) * Number.EPSILON * Math.max(1, Math.abs(value))) * 100);
+  const roundMoney = value => Number.isFinite(value) ? moneyCents(value) / 100 : null;
   const qty = (value, unit) => Number.isFinite(value) ? `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(value)} ${unit}` : "—";
   const parseThicknessComposition = Core.parseThicknessComposition;
 
@@ -2110,7 +2113,7 @@
     const condition = form.clientConditionSelect.value || "retail";
     if (condition !== "retail") {
       const clientPrice = num(item.prices?.[clientConditionPriceKey(condition)]);
-      if (Number.isFinite(clientPrice)) {
+      if (Number.isFinite(clientPrice) && clientPrice >= 0) {
         candidates.push({
           id: `client:${condition}`,
           source: "client",
@@ -2125,7 +2128,7 @@
     // Для нестандарта здесь меняется только применение общего условия клиента.
     if (pricingMode !== "nonstandard") {
       const volumeLevel = Core.automaticVeneerLevel(item, basis.area, basis.sheets);
-      if (volumeLevel?.id && volumeLevel.id !== "retail" && Number.isFinite(volumeLevel.price)) {
+      if (volumeLevel?.id && volumeLevel.id !== "retail" && Number.isFinite(volumeLevel.price) && volumeLevel.price >= 0) {
         candidates.push({
           id: `volume:${volumeLevel.id}`,
           source: "volume",
@@ -2143,7 +2146,8 @@
     const basis = basisOverride && Number.isFinite(num(basisOverride.area))
       ? { area: num(basisOverride.area), sheets: Number.isFinite(num(basisOverride.sheets)) ? num(basisOverride.sheets) : null, exact: basisOverride.exact !== false }
       : Core.veneerVolumeBasis(item, requiredArea);
-    const retailPrice = num(item.prices?.retail);
+    const retailPriceRaw = num(item.prices?.retail);
+    const retailPrice = Number.isFinite(retailPriceRaw) && retailPriceRaw >= 0 ? retailPriceRaw : null;
     const retailPricePerM2 = veneerPricePerM2(item, retailPrice);
     const requestedCondition = form.clientConditionSelect.value || "retail";
     const applicable = veneerConditionCandidates(item, basis, pricingMode);
@@ -4111,16 +4115,21 @@
     const explicitRetail = num(prices?.[clientConditionPriceKey("retail")]);
     const retailRate = Number.isFinite(explicitRetail) ? explicitRetail : rate;
     let selected = null;
+    let invalidDiscount = false;
 
     if (requestedCondition === "retail") {
       if (Number.isFinite(retailRate)) selected = { id: "retail", name: "Розничная цена", sourceMode: Number.isFinite(explicitRetail) ? "direct_price" : "default_rate", price: retailRate };
     } else if (Number.isFinite(retailRate) && retailRate > 0) {
       const directTarget = num(prices?.[requestedKey]);
       const explicitDiscount = num(discounts?.[requestedKey]);
-      if (Number.isFinite(directTarget)) {
+      if (Number.isFinite(directTarget) && directTarget >= 0) {
         selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "direct_price", price: directTarget };
       } else if (Number.isFinite(explicitDiscount)) {
-        selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "discount_percent", price: retailRate * (1 - Math.max(explicitDiscount, 0) / 100) };
+        if (explicitDiscount < 0 || explicitDiscount > 100) {
+          invalidDiscount = true;
+        } else {
+          selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "discount_percent", price: retailRate * (1 - explicitDiscount / 100) };
+        }
       }
     }
 
@@ -4140,6 +4149,7 @@
       sourceMode: selected?.sourceMode || null,
       conditionFound: requestedCondition === "retail" ? true : Boolean(selected),
       conditionUnresolved,
+      invalidDiscount,
       retailRatePerM2: Number.isFinite(retailRate) ? retailRate : null,
       automaticRatePerM2: Number.isFinite(finalRate) ? finalRate : null,
       finalRatePerM2: Number.isFinite(finalRate) ? finalRate : null,
@@ -4211,16 +4221,18 @@
 
   function standardSheetPrices(standard, condition, warnings = []) {
     const retail = num(standard?.pricesPerSheet?.retail);
-    if (!Number.isFinite(retail)) {
-      return { retailSheet: null, finalSheet: null, partial: true, conditionUnresolved: true, note: "Нет розничной цены в строке прайса." };
+    if (!Number.isFinite(retail) || retail < 0) {
+      return { retailSheet: null, finalSheet: null, partial: true, conditionUnresolved: true, note: "Нет корректной розничной цены в строке прайса." };
     }
 
     const selectedConditionId = condition || "retail";
     const selectedKey = clientConditionPriceKey(selectedConditionId);
     const selectedPrice = selectedConditionId === "retail" ? retail : num(standard?.pricesPerSheet?.[selectedKey]);
-    const unresolved = selectedConditionId !== "retail" && !Number.isFinite(selectedPrice);
+    const unresolved = selectedConditionId !== "retail" && (!Number.isFinite(selectedPrice) || selectedPrice < 0);
     if (unresolved) {
-      warnings.push(`Для условия «${clientConditionUiName(selectedConditionId)}» в строке МДФ ${standard.lengthMm}×${standard.widthMm} нет подтверждённой цены; розничная цена автоматически не подставляется.`);
+      warnings.push(Number.isFinite(selectedPrice) && selectedPrice < 0
+        ? `Для условия «${clientConditionUiName(selectedConditionId)}» в строке МДФ ${standard.lengthMm}×${standard.widthMm} указана отрицательная цена. Проверьте прайс; стоимость не рассчитана.`
+        : `Для условия «${clientConditionUiName(selectedConditionId)}» в строке МДФ ${standard.lengthMm}×${standard.widthMm} нет подтверждённой цены; розничная цена автоматически не подставляется.`);
     }
     const finalSheet = unresolved ? null : selectedPrice;
     const automaticDiscountPercent = retail > 0 && Number.isFinite(finalSheet)
@@ -4627,7 +4639,9 @@
           if (basePricing.conditionUnresolved) {
             baseWork = 0;
             (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
-            warnings.push(`Стандарт по запросу: для компонента «${basePricing.componentLabel}» нет подтверждённой цены условия «${basePricing.conditionName}»; розничная ставка автоматически не подставляется.`);
+            warnings.push(basePricing.invalidDiscount
+              ? `Стандарт по запросу: для «${basePricing.componentLabel}» в прайсе некорректная скидка (допустимо 0–100%). Стоимость не рассчитана.`
+              : `Стандарт по запросу: для компонента «${basePricing.componentLabel}» нет подтверждённой цены условия «${basePricing.conditionName}»; розничная ставка автоматически не подставляется.`);
             breakdown.push({
               label: `Стандарт по запросу · ${size.length}×${size.width}`,
               value: 0,
@@ -4814,7 +4828,9 @@
             baseWork = basePricing.conditionUnresolved ? 0 : area * appliedRate;
             if (basePricing.conditionUnresolved) {
               (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
-              warnings.push(`Точный размер: для компонента «${basePricing.componentLabel}» нет подтверждённой цены условия «${basePricing.conditionName}»; розничная ставка автоматически не подставляется.`);
+              warnings.push(basePricing.invalidDiscount
+                ? `Точный размер: для «${basePricing.componentLabel}» в прайсе некорректная скидка (допустимо 0–100%). Стоимость не рассчитана.`
+                : `Точный размер: для компонента «${basePricing.componentLabel}» нет подтверждённой цены условия «${basePricing.conditionName}»; розничная ставка автоматически не подставляется.`);
               breakdown.push({ label: `${base.name} + работа, ${size.length}×${size.width}`, value: 0, note: `Цена условия «${basePricing.conditionName}» для компонента не подтверждена — компонент не включён в итог.` });
             } else {
               breakdown.push({ label: `${base.name} + работа, ${size.length}×${size.width}`, value: baseWork, note: `${rateRow.sourceNote || "Готовая ставка из актуальной таблицы деталировки"}: ${money(appliedRate)}/м².${basePricing.conditionFound && condition !== "retail" ? ` ${basePricing.conditionName} применено по прайсовым данным.` : ""} Коэффициент 1,53 повторно не применяется.` });
@@ -6230,7 +6246,7 @@
       breakdown.push({ label: "Изолятор", value: isolatorCost, note: `${money(data.meta.isolatorRatePerM2)}/м² по фактически обрабатываемым сторонам.` });
     }
 
-    const automaticFinalTotal = finalTotal;
+    let automaticFinalTotal = finalTotal;
     const manualDiscountPercent = 0;
     let manualDiscountCandidateTotal = null;
     let manualDiscountApplied = false;
@@ -6405,6 +6421,19 @@
         hasPartialPrice=!priceCalculationComplete;
       }
     }
+    // An invoice line is the calculated position (or a separate order-level charge).
+    // Round those monetary lines once, then derive the order total from their cents.
+    // Never force reconciliation if the original ledger is already inconsistent.
+    const rawPositionTotalSum = itemResults.reduce((sum, item) => sum + (positionCostByRowId.get(item.rowId) || 0), 0);
+    const rawLedgerReconciled = Math.abs(rawPositionTotalSum + orderLevelUnallocatedCost - finalTotal) <= 0.005;
+    if (isDetailedPanelCalculation() && window.WoodstockPanelsView?.positionPricing && rawLedgerReconciled) {
+      for (const [rowId, cost] of positionCostByRowId) positionCostByRowId.set(rowId, roundMoney(cost));
+      orderLevelUnallocatedCost = roundMoney(orderLevelUnallocatedCost);
+      const positionCents = itemResults.reduce((sum, item) => sum + moneyCents(positionCostByRowId.get(item.rowId) || 0), 0);
+      finalTotal = (positionCents + moneyCents(orderLevelUnallocatedCost)) / 100;
+      automaticFinalTotal = finalTotal;
+      retailTotal = roundMoney(retailTotal);
+    }
     const positionTotalSum = itemResults.reduce((sum, item) => sum + (positionCostByRowId.get(item.rowId) || 0), 0);
     const knownPositionPricingReconciled = Math.abs(positionTotalSum + orderLevelUnallocatedCost - finalTotal) <= 0.005;
     const positionPricingReconciled = window.WoodstockPanelsView?.positionPricing
@@ -6439,7 +6468,7 @@
         : null;
     });
 
-    const vat = finalTotal > 0 ? finalTotal * data.meta.vatRate / (1 + data.meta.vatRate) : 0;
+    const vat = finalTotal > 0 ? roundMoney(finalTotal * data.meta.vatRate / (1 + data.meta.vatRate)) : 0;
     const sandingRatePerM2 = sides === 2 ? data.meta.sandingRatesPerM2.twoSides : data.meta.sandingRatesPerM2.oneSide;
     const sandingPricingStatus = sandingProductionArea > 0 ? (sandingCalculatedArea > 0 ? "calculated_and_pending_production" : "pending_production") : sandingCalculatedArea > 0
       ? (sandingIncludedArea > 0 ? "calculated_and_included" : "calculated")
