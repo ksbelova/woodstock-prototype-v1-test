@@ -4113,23 +4113,24 @@
     const prices = row?.pricesPerM2 && typeof row.pricesPerM2 === "object" ? row.pricesPerM2 : null;
     const discounts = row?.discountsPercent && typeof row.discountsPercent === "object" ? row.discountsPercent : null;
     const explicitRetail = num(prices?.[clientConditionPriceKey("retail")]);
-    const retailRate = Number.isFinite(explicitRetail) ? explicitRetail : rate;
+    const retailRateCandidate = Number.isFinite(explicitRetail) ? explicitRetail : rate;
+    const retailRate = Number.isFinite(retailRateCandidate) && retailRateCandidate >= 0 ? retailRateCandidate : null;
     let selected = null;
     let invalidDiscount = false;
 
     if (requestedCondition === "retail") {
       if (Number.isFinite(retailRate)) selected = { id: "retail", name: "Розничная цена", sourceMode: Number.isFinite(explicitRetail) ? "direct_price" : "default_rate", price: retailRate };
-    } else if (Number.isFinite(retailRate) && retailRate > 0) {
+    } else if (Number.isFinite(retailRate) && retailRate >= 0) {
       const directTarget = num(prices?.[requestedKey]);
       const explicitDiscount = num(discounts?.[requestedKey]);
-      if (Number.isFinite(directTarget) && directTarget >= 0) {
+      if (Number.isFinite(explicitDiscount) && (explicitDiscount < 0 || explicitDiscount > 100)) {
+        invalidDiscount = true;
+      } else if (Number.isFinite(directTarget) && directTarget < 0) {
+        invalidDiscount = true;
+      } else if (Number.isFinite(directTarget)) {
         selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "direct_price", price: directTarget };
       } else if (Number.isFinite(explicitDiscount)) {
-        if (explicitDiscount < 0 || explicitDiscount > 100) {
-          invalidDiscount = true;
-        } else {
-          selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "discount_percent", price: retailRate * (1 - explicitDiscount / 100) };
-        }
+        selected = { id: requestedCondition, name: clientConditionUiName(requestedCondition), sourceMode: "discount_percent", price: retailRate * (1 - explicitDiscount / 100) };
       }
     }
 
