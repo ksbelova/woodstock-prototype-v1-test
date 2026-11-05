@@ -3517,8 +3517,10 @@
       const standardSizeAvailable = !isDetailedPanelCalculation() || mode !== "standard" ||
         Boolean(selectedStandardSource && isKnownStandardSize(selectedStandardSource));
       const fitKnown = needsProductionFitCheck && length > 0 && width > 0;
+      const finishedSizeApprovalRequired = isDetailedPanelCalculation() && fitKnown &&
+        manufacturingType === "exact" && parseThicknessComposition(currentBaseThicknessRaw()).total === 21;
       const productionFitUnconfirmed = isDetailedPanelCalculation() && fitKnown &&
-        (!productionSourceFormatsForBase().length || !sizeFitsProduction(length, width, productionAllowance));
+        (finishedSizeApprovalRequired || !productionSourceFormatsForBase().length || !sizeFitsProduction(length, width, productionAllowance));
       const physicalSizeValid = productionFitUnconfirmed || !needsProductionFitCheck ||
         !(length > 0 && width > 0) || sizeFitsProduction(length, width, productionAllowance);
       const size = {
@@ -3538,6 +3540,7 @@
         resultMode,
         physicalSizeValid,
         productionFitUnconfirmed,
+        finishedSizeApprovalRequired,
         standardSizeAvailable,
         calcLength,
         calcWidth,
@@ -4197,7 +4200,7 @@
     const automaticCoefficient = Number.isFinite(baselineRatePerM2) && baselineRatePerM2 > 0 && Number.isFinite(thickRatePerM2) && thickRatePerM2 > 0
       ? thickRatePerM2 / baselineRatePerM2
       : null;
-    const manualValue = isDetailedPanelCalculation() ? null : num(priceAdjustmentOverrides.get(id));
+    const manualValue = num(priceAdjustmentOverrides.get(id));
     const changedManually = Number.isFinite(manualValue) && manualValue > 0;
     const actualCoefficient = changedManually ? manualValue : automaticCoefficient;
 
@@ -4370,10 +4373,10 @@
     if (!data) return null;
     if (isDetailedPanelCalculation()) {
       [...priceAdjustmentOverrides.keys()].forEach(key => {
-        // Расход шпона, скорректированный менеджером, должен переживать recalc().
+        // Расход шпона и коэффициент работы, заданные менеджером, сохраняются при пересчёте.
         // Остальные неподтверждённые корректировки сохраняют прежний порядок сброса.
         const id = String(key);
-        if (!id.startsWith("mixmatch-material:") && !id.startsWith("veneer-actual:")) {
+        if (!id.startsWith("mixmatch-material:") && !id.startsWith("veneer-actual:") && !id.startsWith("thick-veneer-work:")) {
           priceAdjustmentOverrides.delete(key);
         }
       });
@@ -6349,7 +6352,9 @@
     if (unconfirmedFitItems.length) {
       hasPartialPrice = true;
       unconfirmedFitItems.forEach(item => {
-        const message = "Возможность изготовления не подтверждена: нет подходящего исходного формата для размера с припуском";
+        const message = item.finishedSizeApprovalRequired
+          ? "Максимальный чистовой размер для основы 21 мм не подтверждён. Согласуйте размер с производством"
+          : "Возможность изготовления не подтверждена: нет подходящего исходного формата для размера с припуском";
         markPositionPending(item, message);
         warnings.push(`Позиция ${item.position}: ${message}. Размеры сохранены для проверки; наличие цены производства само по себе не подтверждает формат.`);
       });
@@ -6937,7 +6942,6 @@
   }
 
   function renderCoefficientAdjustmentControl({ id, name, automaticCoefficient = null, coefficient = null, note = "" }) {
-    if (isDetailedPanelCalculation()) return;
     const wrapper = document.createElement("div");
     wrapper.className = "dynamic-adjustment-row";
 
@@ -7270,21 +7274,13 @@
       const note = Number.isFinite(thickWork.automaticCoefficient)
         ? `Авто по стандартным ставкам: ${money(thickWork.thickRatePerM2)}/м² ÷ ${money(thickWork.baselineRatePerM2)}/м² = × ${round(thickWork.automaticCoefficient, 4)}`
         : "Нет пары стандартных ставок 0,6 мм / 1,5 мм+ для этой основы, толщины и количества сторон.";
-      if (isDetailedPanelCalculation()) {
-        const summary = document.createElement("p");
-        summary.className = "field__note";
-        summary.dataset.thickVeneerEstimate = "true";
-        summary.textContent = note + ". " + thickVeneerEstimateNote();
-        form.priceAdjustmentsList.append(summary);
-      } else {
-        renderCoefficientAdjustmentControl({
-          id: thickWork.id,
-          name: "Коэффициент работы с толстым лицевым шпоном",
-          automaticCoefficient: thickWork.automaticCoefficient,
-          coefficient: thickWork.actualCoefficient,
-          note
-        });
-      }
+      renderCoefficientAdjustmentControl({
+        id: thickWork.id,
+        name: "Коэффициент работы с толстым лицевым шпоном",
+        automaticCoefficient: thickWork.automaticCoefficient,
+        coefficient: thickWork.actualCoefficient,
+        note: isDetailedPanelCalculation() ? note + ". " + thickVeneerEstimateNote() : note
+      });
       rowCount += 1;
     }
 

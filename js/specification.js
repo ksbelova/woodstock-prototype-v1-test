@@ -669,6 +669,20 @@
   });
   try{
     const all=State.read();
+    all.forEach(record=>{
+      if(record.productType!=='plate'||Number(record.baseThickness)!==21)return;
+      const sizes=(record.sizes||[]).filter(row=>row.manufacturingType==='exact'||(!row.manufacturingType&&row.cleanCuttingRequired===true));
+      if(!sizes.length)return;
+      const warning='Максимальный чистовой размер для основы 21 мм не подтверждён. Согласуйте размер с производством.';
+      sizes.forEach(row=>{
+        row.productionFitStatus='unconfirmed';
+        row.pricingPartial=true;
+        row.pricingComplete=false;
+        row.pendingCosts=[...new Set([...(row.pendingCosts||[]),warning])];
+      });
+      record.pricingPartial=true;
+      record.warnings=[...new Set([...(record.warnings||[]),warning])];
+    });
     if(!requestedType&&all.length)productType=all[all.length-1].productType==='flooring'?'flooring':'plate';
     records=all.filter(record=>record.productType===productType);otherRecords=all.filter(record=>record.productType!==productType);
     sessionStorage.setItem('woodstockSpecificationProduct',productType);
