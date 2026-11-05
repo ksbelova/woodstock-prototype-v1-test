@@ -27,7 +27,22 @@
     try{sessionStorage.setItem(metadataKey,JSON.stringify(next));order=next;renderExtras();}catch(error){status('Не удалось сохранить данные заказа: '+error.message);}
   }
   function services(){return [...(order.packagingSelect?['Упаковка: '+order.packagingSelect]:[]),...Object.entries(serviceNames).filter(([id])=>order[id]).map(([,label])=>label)];}
-  function known(record){if(inProduction(record))return materialKnown(record);if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){const live=editorController.result?.();const value=live?.finalTotal??live?.total??null;return partial(record)&&value===0?null:roundMoney(value);}const value=Number.isFinite(record.specification?.knownTotal)?record.specification.knownTotal:Number.isFinite(record.total)?record.total:null;return partial(record)&&value===0?null:(Number.isFinite(value)?roundMoney(value+edgeDiscount(record).delta):value);}
+  function known(record){
+    // A partial record with no calculated monetary amount is unknown, not a zero-ruble offer.
+    if(inProduction(record)){
+      const materialCost=materialKnown(record);
+      return moneyCents(materialCost)!==0?materialCost:null;
+    }
+    if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){
+      const live=editorController.result?.();
+      const value=live?.finalTotal??live?.total??null;
+      const rounded=roundMoney(value);
+      return partial(record)&&(!Number.isFinite(rounded)||moneyCents(rounded)===0)?null:rounded;
+    }
+    const value=Number.isFinite(record.specification?.knownTotal)?record.specification.knownTotal:Number.isFinite(record.total)?record.total:null;
+    const rounded=Number.isFinite(value)?roundMoney(value+edgeDiscount(record).delta):null;
+    return partial(record)&&(!Number.isFinite(rounded)||moneyCents(rounded)===0)?null:rounded;
+  }
   function partial(record){if(record.sizes?.some(row=>row.productionFitStatus==='unconfirmed'))return true;if(inProduction(record))return !quoteState().valid||!materialsComplete(record);if(editorController&&editorIndex!==null&&records[editorIndex]?.id===record.id){const live=editorController.result?.();return !live||(productType==='plate'?!live.priceCalculationComplete:!Number.isFinite(live.total));}return record.pricingPartial===true||!Number.isFinite(record.total);}
     // Production quote belongs to the order and is never allocated to individual rows.
   const productionReason = reason => /^(Стоимость производства|Основа и производственные операции|Работа с толстым шпоном|Операция кромления:|Калибровка:|Фаска:|Финишное покрытие)/.test(reason);
