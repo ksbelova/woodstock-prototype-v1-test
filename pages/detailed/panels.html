@@ -237,14 +237,9 @@
             </div>
 
             <div class="field-grid field-grid--two">
-              <label class="field">
-                <span class="field__label">Фаска на кромке</span>
-                <select id="edgeBevelSelect">
-                  <option value="no">Нет</option>
-                  <option value="yes">Да</option>
-                </select>
-                <span class="field__note" id="edgeBevelNote">Стоимость фаски определяется производством в составе общей суммы работ.</span>
-              </label>
+              <select id="edgeBevelSelect" hidden disabled aria-hidden="true">
+                <option value="no">Нет</option>
+              </select>
               <div class="field">
                 <span class="field__label">Расчётный метраж</span>
                 <p class="field__note" id="attachedEdgeMetersSummary">—</p>
@@ -520,6 +515,6 @@
   <script src="../../js/core/panels-core.js?v=20261028-edge-threshold"></script>
   <script src="../../js/core/specification-state.js"></script>
   <script src="../../js/specification-bridge.js"></script>
-  <script src="../../js/detailed-panels.js?v=20261106-auto-facade-edge-finish-sides"></script>
+  <script src="../../js/detailed-panels.js?v=20261106-edge-comments-no-bevel"></script>
 </body>
 </html>

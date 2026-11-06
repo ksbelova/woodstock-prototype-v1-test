@@ -1178,6 +1178,8 @@
       });
     hint.classList.toggle("is-hidden", !needsComment);
     form.edgeCommentInput.placeholder = needsComment ? hint.textContent : "";
+    form.edgeCommentInput.required = needsComment;
+    form.edgeCommentInput.setAttribute("aria-required", String(needsComment));
   }
 
   function syncVeneerBCutUI(preserve = true) {
@@ -5792,7 +5794,7 @@
         validationError: "",
         sidesId: commonSides,
         sidesName: edgeRuleById(commonSides)?.name || "",
-        bevel: form.edgeBevelSelect.value === "yes",
+        bevel: !isDetailedPanelCalculation() && form.edgeBevelSelect.value === "yes",
         comment: form.edgeCommentInput.value.trim(),
         geometricMeters: 0,
         calculatedMeters: 0,
@@ -7576,6 +7578,9 @@
     });
 
     const edgeMode = form.edgeModeSelect.value;
+    if (isDetailedPanelCalculation() && form.edgeCommentInput.required && !form.edgeCommentInput.value.trim()) {
+      add("edgeComment", "стороны облицовки в комментарии", form.edgeCommentInput, "Укажите по схеме, какие стороны облицевать.");
+    }
     if (edgeMode !== "none" && result?.edge?.valid !== true) {
       const which = edgeMode === "separate" ? "separate" : "attached";
       const controls = edgeControls(which);
@@ -7912,17 +7917,10 @@
 
   function syncDetailedBevelAvailability() {
     if (!isDetailedPanelCalculation()) return;
-    const thickVeneer = selectedVeneerThickness() >= 1.5;
-    const edgedRows = readSizeRows().map(effectiveEdgeForSize).filter(item => item.applies);
-    const thickEdge = edgedRows.length > 0
-      ? edgedRows.every(item => Number.isFinite(item.thicknessMm) && item.thicknessMm >= 1.5)
-      : currentEdgeThickness("attached") >= 1.5;
-    const available = thickVeneer || thickEdge;
-    form.edgeBevelSelect.disabled = !available;
-    if (!available) form.edgeBevelSelect.value = "no";
-    const note = document.getElementById("edgeBevelNote");
-    if (note) note.textContent = (available ? "" : "Фаска доступна только при толстом шпоне или толстой кромке. ") +
-      "Стоимость фаски определяется производством в составе общей суммы работ.";
+    form.edgeBevelSelect.value = "no";
+    form.edgeBevelSelect.disabled = true;
+    form.edgeBevelSelect.closest("label")?.classList.add("is-hidden");
+    form.edgeBevelSelect.hidden = true;
   }
 
   function recalc() {
