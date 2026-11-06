@@ -1957,3 +1957,29 @@ input[type="file"]::file-selector-button:hover {
 .quick-panels-page .prototype-review-note strong {
   font-weight: 700;
 }
+
+/* Схема сторон для подробного расчёта плит. */
+.edge-side-diagram {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px minmax(0, 1fr);
+  grid-template-rows: auto 80px auto;
+  gap: 8px;
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+.edge-side-diagram__top { grid-area: 1 / 2; }
+.edge-side-diagram__left { grid-area: 2 / 1; }
+.edge-side-diagram__square {
+  grid-area: 2 / 2;
+  width: 80px;
+  height: 80px;
+  border: 1px solid currentColor;
+}
+.edge-side-diagram__right { grid-area: 2 / 3; }
+.edge-side-diagram__bottom { grid-area: 3 / 2; }

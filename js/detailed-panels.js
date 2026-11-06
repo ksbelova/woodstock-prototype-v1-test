@@ -62,6 +62,9 @@
   const positionEdgeState = new Map();
   const uploadedFilesState = new WeakMap();
   const priceAdjustmentOverrides = new Map();
+  const edgeSideDiagramTemplate = el("edgeSideDiagram")?.cloneNode(true);
+  const edgeSideCommentHintTemplate = el("edgeSideCommentHint")?.cloneNode(true);
+
   let priceListClientConditionsCache = null;
   let veneerDemandSignatureState = "";
   let layoutFieldInteracted = false;
@@ -1131,6 +1134,50 @@
     syncEdgeVeneerDefaults();
     renderStandardSizes();
     recalc();
+  }
+
+  function arrangeDetailedSideFields() {
+    if (!isDetailedPanelCalculation()) return;
+    let backGrid = el("backVeneerLayoutGrid");
+    if (!backGrid) {
+      backGrid = document.createElement("div");
+      backGrid.id = "backVeneerLayoutGrid";
+      backGrid.className = "field-grid field-grid--two";
+      form.veneerLayoutGrid.after(backGrid);
+    }
+    backGrid.append(form.veneerBCutField, form.layoutBField);
+    form.veneerCutField.querySelector(".field__label").textContent = "Тип рисунка лицевой стороны";
+    form.edgeModeSelect.closest(".field").querySelector(".field__label").textContent = "Потребуется кромка?";
+    const modeLabels = { none: "Без кромки", attached: "Облицовка деталей кромкой", separate: "Кромка в рулоне" };
+    Array.from(form.edgeModeSelect.options).forEach(option => {
+      if (modeLabels[option.value]) option.textContent = modeLabels[option.value];
+    });
+    form.edgeSidesSelect.closest(".field").querySelector(".field__label").textContent = "Стороны облицовки";
+    const emptySide = form.edgeSidesSelect.querySelector('option[value=""]');
+    if (emptySide) emptySide.textContent = "Выберите стороны облицовки";
+    if (!el("edgeSideDiagram") && edgeSideDiagramTemplate) form.edgeSidesSelect.after(edgeSideDiagramTemplate.cloneNode(true));
+    if (!el("edgeSideCommentHint") && edgeSideCommentHintTemplate) form.edgeCommentInput.after(edgeSideCommentHintTemplate.cloneNode(true));
+    form.edgeCommentInput.setAttribute("aria-describedby", "edgeSideCommentHint");
+    form.edgeSidesSelect.setAttribute("aria-describedby", "edgeSideDiagram");
+  }
+
+  function updateDetailedSideHints() {
+    if (!isDetailedPanelCalculation()) return;
+    if (Number(form.veneeredSidesSelect.value) !== 2 || form.veneerBModeSelect.value !== "other") {
+      form.veneerBCutField.classList.add("is-hidden");
+    }
+    el("backVeneerLayoutGrid")?.classList.toggle("is-hidden",
+      form.veneerBCutField.classList.contains("is-hidden") && form.layoutBField.classList.contains("is-hidden"));
+    const hint = el("edgeSideCommentHint");
+    if (!hint) return;
+    const ambiguous = new Set(["one_length", "one_width", "one_length_one_width", "two_lengths_one_width", "one_length_two_width"]);
+    const needsComment = form.edgeModeSelect.value === "attached" &&
+      readSizeRows().some(size => {
+        const edge = effectiveEdgeForSize(size);
+        return edge.applies && ambiguous.has(edge.sidesId);
+      });
+    hint.classList.toggle("is-hidden", !needsComment);
+    form.edgeCommentInput.placeholder = needsComment ? hint.textContent : "";
   }
 
   function syncVeneerBCutUI(preserve = true) {
@@ -7895,6 +7942,7 @@
     if (edgeModeChangedByAvailability || isQuickManufacturedPanel()) syncEdgeModeFields();
     if (form.edgeModeSelect.value === "attached" && positionEdgeOverridesEnabled) renderPositionEdgeOverrides();
     syncDetailedBevelAvailability();
+    updateDetailedSideHints();
     syncVeneerActualOverridesWithDemand();
     lastCalculation = calculate();
     if (!lastCalculation) {
@@ -9544,7 +9592,7 @@
       });
       setupEdgeAutocomplete("attached");
       setupEdgeAutocomplete("separate");
-      populate(); bind(); syncEdgeVeneerDefaults(); updateEdgeUI(); recalc();
+      populate(); arrangeDetailedSideFields(); bind(); syncEdgeVeneerDefaults(); updateEdgeUI(); recalc();
     } catch (error) { console.error(error); form.saveStatus.textContent = "Не удалось загрузить данные расчёта. Откройте прототип через локальный HTTP-сервер."; }
   }
 
@@ -9563,6 +9611,18 @@
   }
   function restoreSpecificationState(state) {
     if (state?.version!==1) throw new Error('У позиции отсутствуют данные для редактирования.');
+    if (isDetailedPanelCalculation()) {
+      const savedForm = document.createElement("div");
+      savedForm.innerHTML = state.form.html;
+      if (!savedForm.querySelector("#backVeneerLayoutGrid")) {
+        const backGrid = document.createElement("div");
+        backGrid.id = "backVeneerLayoutGrid";
+        backGrid.className = "field-grid field-grid--two";
+        savedForm.querySelector("#veneerLayoutGrid").after(backGrid);
+        backGrid.append(savedForm.querySelector("#veneerBCutField"), savedForm.querySelector("#layoutBField"));
+        state = { ...state, form: { ...state.form, html: savedForm.innerHTML } };
+      }
+    }
     window.WoodstockSpecificationState.restore(form.root,state.form,(input,files)=>uploadedFilesState.set(input,files));
     selectedVeneerAGroup=state.selectedVeneerAGroup; selectedVeneerA=state.selectedVeneerA;
     selectedVeneerBGroup=state.selectedVeneerBGroup; selectedVeneerB=state.selectedVeneerB;
@@ -9583,6 +9643,7 @@
       bindFileInput(input,output,true);
       input.addEventListener('change',()=>{updateSizeTransitionUI(row);recalc();});
     });
+    arrangeDetailedSideFields();
     ["attached", "separate"].forEach(which => syncEdgeThicknessOptions(which, { preserve: true }));
     if (isQuickManufacturedPanel()) {
       [form.edgeModeSelect, form.edgeTypeSelect, form.edgeBevelSelect].forEach(input =>

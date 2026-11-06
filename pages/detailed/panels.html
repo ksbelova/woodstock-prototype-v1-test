@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Плитные материалы и изделия — подробный расчёт Woodstock</title>
-  <link rel="stylesheet" href="../../css/main.css" />
+  <link rel="stylesheet" href="../../css/main.css?v=20261106-edge-side-diagram" />
 </head>
 <body>
   <main class="start-page calc-page plate-page">
@@ -107,12 +107,6 @@
               </div>
               <span class="field__error" id="veneerBError"></span>
             </div>
-            <label class="field is-hidden" id="veneerBCutField">
-              <span class="field__label">Тип рисунка обратной стороны</span>
-              <select id="veneerBCutSelect" aria-describedby="veneerBCutHint"><option value="">Выберите тип рисунка</option></select>
-              <span class="field__note" id="veneerBCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
-              <span class="field__error" id="veneerBCutError"></span>
-            </label>
             <label class="field is-hidden" id="veneerBRoughThicknessField">
               <span class="field__label">Толщина чернового шпона обратной стороны</span>
               <select id="veneerBRoughThicknessSelect"><option value="">Выберите толщину</option></select>
@@ -121,7 +115,7 @@
 
           <div class="field-grid field-grid--two is-hidden" id="veneerLayoutGrid">
             <label class="field is-hidden" id="veneerCutField">
-              <span class="field__label">Тип рисунка</span>
+              <span class="field__label">Тип рисунка лицевой стороны</span>
               <select id="veneerCutSelect" aria-describedby="veneerCutHint"><option value="">Выберите тип рисунка</option></select>
               <span class="field__note" id="veneerCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
               <span class="field__error" id="veneerCutError"></span>
@@ -133,10 +127,18 @@
             </label>
           </div>
 
+          <div class="field-grid field-grid--two" id="backVeneerLayoutGrid">
+            <label class="field is-hidden" id="veneerBCutField">
+              <span class="field__label">Тип рисунка обратной стороны</span>
+              <select id="veneerBCutSelect" aria-describedby="veneerBCutHint"><option value="">Выберите тип рисунка</option></select>
+              <span class="field__note" id="veneerBCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
+              <span class="field__error" id="veneerBCutError"></span>
+            </label>
           <label class="field is-hidden" id="layoutBField">
             <span class="field__label">Раскладка / рисунок шпона — обратная сторона</span>
             <select id="layoutBSelect"><option value="">Как на стороне А</option></select>
           </label>
+          </div>
 
           <div class="conditional-block is-hidden" id="layoutTzFields">
             <label class="field">
@@ -169,21 +171,28 @@
         <section class="form-block">
           <h2>Кромка</h2>
           <label class="field">
-            <span class="field__label">Кромка</span>
+            <span class="field__label">Потребуется кромка?</span>
             <select id="edgeModeSelect">
-              <option value="none">Не нужна</option>
-              <option value="attached">Кромление детали</option>
-              <option value="separate">Кромка отдельно</option>
+              <option value="none">Без кромки</option>
+              <option value="attached">Облицовка деталей кромкой</option>
+              <option value="separate">Кромка в рулоне</option>
             </select>
           </label>
 
           <div class="conditional-block is-hidden" id="attachedEdgeFields">
             <div class="field-grid field-grid--two">
               <label class="field">
-                <span class="field__label">Стороны кромления</span>
-                <select id="edgeSidesSelect">
-                  <option value="">Выберите стороны кромления</option>
+                <span class="field__label">Стороны облицовки</span>
+                <select id="edgeSidesSelect" aria-describedby="edgeSideDiagram">
+                  <option value="">Выберите стороны облицовки</option>
                 </select>
+                <span class="edge-side-diagram" id="edgeSideDiagram" role="img" aria-label="Схема сторон детали: сверху — Длина, верх; снизу — Длина, низ; слева — Ширина, лево; справа — Ширина, право.">
+                  <span class="edge-side-diagram__top">Длина, верх</span>
+                  <span class="edge-side-diagram__left">Ширина, лево</span>
+                  <span class="edge-side-diagram__square" aria-hidden="true"></span>
+                  <span class="edge-side-diagram__right">Ширина, право</span>
+                  <span class="edge-side-diagram__bottom">Длина, низ</span>
+                </span>
               </label>
               <label class="field">
                 <span class="field__label">Тип кромки</span>
@@ -305,7 +314,8 @@
           <div class="conditional-block is-hidden" id="edgeCommentField">
             <label class="field">
               <span class="field__label">Комментарий</span>
-              <textarea id="edgeCommentInput" rows="3"></textarea>
+              <textarea id="edgeCommentInput" rows="3" aria-describedby="edgeSideCommentHint"></textarea>
+              <span class="field__note is-hidden" id="edgeSideCommentHint"><em>Укажите по схеме, какие стороны облицевать. Например: Длина, верх, длина, низ, ширина, лево.</em></span>
               <span class="field__note">Укажите при необходимости цвет, артикул или другие требования к кромке.</span>
             </label>
           </div>
@@ -510,6 +520,6 @@
   <script src="../../js/core/panels-core.js?v=20261028-edge-threshold"></script>
   <script src="../../js/core/specification-state.js"></script>
   <script src="../../js/specification-bridge.js"></script>
-  <script src="../../js/detailed-panels.js?v=20261106-edge-glue-rules"></script>
+  <script src="../../js/detailed-panels.js?v=20261106-edge-sides-presentation"></script>
 </body>
 </html>
