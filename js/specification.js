@@ -599,7 +599,7 @@
     if(productionRows().length)before.push(...pdfTable('Общая стоимость производства',['Параметр','Значение'],productionRows(),[230,309]));
     const title=type=>type==='plate'?'Плитные материалы и изделия':'Инженерная доска';
     const headers=type=>type==='plate'?panelHeaders:floorHeaders;
-    const widths=[14,58,80,54,65,72,62,65,64,85];
+    const widths=[productType==='plate'?24:14,58,80,54,65,72,62,65,64,85];
     groups.slice(1).forEach(group=>before.push(...pdfTable(title(group.type),headers(group.type),group.rows.map(item=>item.cells),widths)));
     if(edgeRows().length)before.push(...pdfTable('Спецификация кромки — стоимость уже включена в итог изделий',edgeHeaders,edgeRows()));
     before.push(...pdfTable('Данные менеджера и клиента',['Параметр','Значение'],[
@@ -615,7 +615,7 @@
     if(order.servicesCommentInput)before.push({text:'Комментарий к услугам: '+order.servicesCommentInput,style:'infoText'});
     if(conditions().length)before.push(...pdfTable('Применённые ценовые условия — уже учтены в цене',['Изделие','Составляющая','Условие','Значение','Результат'],conditions(),[28,100,160,120,131]));
     before.push(...pdfTable('Итог по изделиям',['Изделие','Стоимость с НДС'],records.map((record,index)=>[(index+1)+'. '+(record.title||record.species),money(known(record))]).concat(quoteState().scope.length?[["Производство для клиента общей суммой",money(quoteState().clientCost)]]:[]),[400,139]));
-    const product={title:title(first.type),subtitle:'Подробный расчёт',widths,header:headers(first.type).map(text=>({text,style:'tableHeader'})),rows:first.rows.map(item=>item.cells),dontBreakRows:false,beforePrice:before,afterPrice:[{text:result.partial?'* Частичная стоимость: учтены только рассчитанные составляющие. Стоимость кромки и общих затрат не начисляется повторно.':'Стоимость кромки и общих затрат уже включена в итог.',style:'infoSmall'},...(result.partial?[{text:$('partialNote').textContent,style:'infoText'}]:[])]};
+    const product={title:title(first.type),subtitle:'Подробный расчёт',widths,header:headers(first.type).map(text=>({text,style:'tableHeader'})),rows:first.rows.map(item=>item.cells.map((cell,index)=>first.type==='plate'&&index===0?{text:String(cell),noWrap:true}:cell)),dontBreakRows:false,beforePrice:before,afterPrice:[{text:result.partial?'* Частичная стоимость: учтены только рассчитанные составляющие. Стоимость кромки и общих затрат не начисляется повторно.':'Стоимость кромки и общих затрат уже включена в итог.',style:'infoSmall'},...(result.partial?[{text:$('partialNote').textContent,style:'infoText'}]:[])]};
     const doc=Common.createPdfDocument({createdAt:order.createdAt,contact:{name:order.clientNameInput,phone:order.clientPhoneInput,email:order.clientEmailInput,city:order.branchSelect},pricing:{total:result.total,vat:result.vat,partial:result.partial,finalPricePerM2:null}},product);
     // Branch belongs to the manager, not to the client. Keep the existing client layout with the correct label.
     const client=doc.content.find(node=>node.table?.body?.[0]?.[0]?.stack?.[0]?.text==='Имя');
@@ -670,7 +670,19 @@
   try{
     const all=State.read();
     all.forEach(record=>{
-      if(record.productType!=='plate'||Number(record.baseThickness)!==21)return;
+      if(record.productType!=='plate')return;
+      const fractionalSizes=(record.sizes||[]).filter(row=>!Number.isInteger(Number(row.length))||!Number.isInteger(Number(row.width)));
+      if(fractionalSizes.length){
+        const warning='Ошибка размеров: укажите длину и ширину целыми числами миллиметров.';
+        fractionalSizes.forEach(row=>{
+          row.pricingPartial=true;
+          row.pricingComplete=false;
+          row.pendingCosts=[...new Set([...(row.pendingCosts||[]),warning])];
+        });
+        record.pricingPartial=true;
+        record.warnings=[...new Set([...(record.warnings||[]),warning])];
+      }
+      if(Number(record.baseThickness)!==21)return;
       const sizes=(record.sizes||[]).filter(row=>row.manufacturingType==='exact'||(!row.manufacturingType&&row.cleanCuttingRequired===true));
       if(!sizes.length)return;
       const warning='Максимальный чистовой размер для основы 21 мм не подтверждён. Согласуйте размер с производством.';

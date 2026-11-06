@@ -3554,7 +3554,9 @@
       size.technologicalSizeValid = technologicalState.valid;
       size.technologicalSizeLimit = technologicalState.limit;
       size.minimumSizeValid = manufacturingType !== "exact" || !(length > 0 && width > 0) || (length >= 50 && width >= 50);
-      size.sizeValid = physicalSizeValid && technologicalState.valid && size.minimumSizeValid && standardSizeAvailable;
+      size.integerDimensionsValid = !isDetailedPanelCalculation() ||
+        ((length === null || Number.isInteger(length)) && (width === null || Number.isInteger(width)));
+      size.sizeValid = physicalSizeValid && technologicalState.valid && size.minimumSizeValid && standardSizeAvailable && size.integerDimensionsValid;
       size.area = length && width && quantity && size.sizeValid ? length * width * quantity / 1_000_000 : 0;
       size.calcArea = calcLength && calcWidth && quantity && size.sizeValid ? calcLength * calcWidth * quantity / 1_000_000 : 0;
       return size;
@@ -3814,6 +3816,12 @@
       updateSizeRowAvailability(row);
       recalc();
       setSizeFieldError(row, key, `${label}: введите числовое значение.`);
+      return false;
+    }
+
+    if (isDetailedPanelCalculation() && !Number.isInteger(value)) {
+      recalc();
+      setSizeFieldError(row, key, `${label}: введите целое число миллиметров.`);
       return false;
     }
 
@@ -4395,11 +4403,12 @@
     const transitionQuantityInvalidRows = sizes.filter((size) => !isQuickWallPanel() && size.transition && (window.WoodstockPanelsView?.transitionMinimumPieces ? shortTransitionState().pieces < window.WoodstockPanelsView.transitionMinimumPieces : size.quantityValid && Number.isFinite(size.quantity) && size.quantity > 1));
     const transitionDescriptionInvalidRows = sizes.filter((size) => !isQuickWallPanel() && size.transition && !(window.WoodstockPanelsView?.transitionMinimumPieces ? shortTransitionState().described : size.comment || size.files.length));
     const minimumSizeInvalidRows = sizes.filter(size => size.minimumSizeValid === false);
+    const fractionalSizeRows = sizes.filter(size => size.integerDimensionsValid === false);
     const physicalSizeInvalidRows = sizes.filter((size) => size.physicalSizeValid === false);
     const technologicalSizeInvalidRows = sizes.filter((size) => size.physicalSizeValid !== false && size.technologicalSizeValid === false);
     const unavailableStandardRows = sizes.filter((size) => size.standardSizeAvailable === false);
     const sizeValidation = {
-      valid: minimumSizeInvalidRows.length === 0 && unavailableStandardRows.length === 0 && incompleteSizeRows.length === 0 && quantityInvalidRows.length === 0 && transitionQuantityInvalidRows.length === 0 && transitionDescriptionInvalidRows.length === 0 && physicalSizeInvalidRows.length === 0 && technologicalSizeInvalidRows.length === 0,
+      valid: fractionalSizeRows.length === 0 && minimumSizeInvalidRows.length === 0 && unavailableStandardRows.length === 0 && incompleteSizeRows.length === 0 && quantityInvalidRows.length === 0 && transitionQuantityInvalidRows.length === 0 && transitionDescriptionInvalidRows.length === 0 && physicalSizeInvalidRows.length === 0 && technologicalSizeInvalidRows.length === 0,
       incompleteSizePositions: incompleteSizeRows.map((size) => size.position),
       quantityInvalidPositions: quantityInvalidRows.map((size) => size.position),
       transitionQuantityInvalidPositions: transitionQuantityInvalidRows.map((size) => size.position),
@@ -4407,7 +4416,9 @@
       physicalSizeInvalidPositions: physicalSizeInvalidRows.map((size) => size.position),
       technologicalSizeInvalidPositions: technologicalSizeInvalidRows.map((size) => size.position),
       unavailableStandardPositions: unavailableStandardRows.map((size) => size.position),
-      error: minimumSizeInvalidRows.length ? "Минимальный размер готовой детали — 50 мм по каждой стороне." : unavailableStandardRows.length
+      error: fractionalSizeRows.length
+        ? `Позиции ${fractionalSizeRows.map(size => size.position).join(", ")}: введите длину и ширину целыми числами миллиметров.`
+        : minimumSizeInvalidRows.length ? "Минимальный размер готовой детали — 50 мм по каждой стороне." : unavailableStandardRows.length
         ? `Позиции ${unavailableStandardRows.map((size) => size.position).join(", ")}: выбранный стандартный формат больше не доступен для текущей основы и толщины. Выберите другой формат или укажите свой размер.`
         : incompleteSizeRows.length
         ? `Заполните длину, ширину и количество в позициях ${incompleteSizeRows.map((size) => size.position).join(", ")} или удалите эти позиции.`
