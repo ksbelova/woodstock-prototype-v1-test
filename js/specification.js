@@ -623,7 +623,7 @@
     doc.content[0].columns[2].stack=doc.content[0].columns[2].stack.filter(node=>!node.text?.startsWith('Номер расчёта:'));
     // Individual row prices are already shown; an aggregate price must not replace them.
     const totalStack=doc.content.find(node=>node.stack?.some(part=>part.text==='Расчётная цена за м² с НДС'));
-    if(totalStack)totalStack.stack=totalStack.stack.slice(3);
+    if(totalStack){totalStack.stack=totalStack.stack.slice(3);totalStack.unbreakable=true;}
     return doc;
   }
   window.WoodstockSpecification={
@@ -681,7 +681,7 @@
         row.pendingCosts=[...new Set([...(row.pendingCosts||[]),warning])];
       });
       record.pricingPartial=true;
-      record.warnings=[...new Set([...(record.warnings||[]),warning])];
+      if(!(record.warnings||[]).some(note=>note.includes(warning)))record.warnings=[...(record.warnings||[]),warning];
     });
     if(!requestedType&&all.length)productType=all[all.length-1].productType==='flooring'?'flooring':'plate';
     records=all.filter(record=>record.productType===productType);otherRecords=all.filter(record=>record.productType!==productType);
