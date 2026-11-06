@@ -109,7 +109,8 @@
             </div>
             <label class="field is-hidden" id="veneerBCutField">
               <span class="field__label">Тип рисунка обратной стороны</span>
-              <select id="veneerBCutSelect"><option value="">Выберите тип рисунка</option></select>
+              <select id="veneerBCutSelect" aria-describedby="veneerBCutHint"><option value="">Выберите тип рисунка</option></select>
+              <span class="field__note" id="veneerBCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
               <span class="field__error" id="veneerBCutError"></span>
             </label>
             <label class="field is-hidden" id="veneerBRoughThicknessField">
@@ -121,7 +122,8 @@
           <div class="field-grid field-grid--two is-hidden" id="veneerLayoutGrid">
             <label class="field is-hidden" id="veneerCutField">
               <span class="field__label">Тип рисунка</span>
-              <select id="veneerCutSelect"><option value="">Выберите тип рисунка</option></select>
+              <select id="veneerCutSelect" aria-describedby="veneerCutHint"><option value="">Выберите тип рисунка</option></select>
+              <span class="field__note" id="veneerCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
               <span class="field__error" id="veneerCutError"></span>
             </label>
             <label class="field is-hidden" id="layoutField">
@@ -508,6 +510,6 @@
   <script src="../../js/core/panels-core.js?v=20261028-edge-threshold"></script>
   <script src="../../js/core/specification-state.js"></script>
   <script src="../../js/specification-bridge.js"></script>
-  <script src="../../js/detailed-panels.js?v=20261106-veneer-species-labels"></script>
+  <script src="../../js/detailed-panels.js?v=20261106-pattern-layout-labels"></script>
 </body>
 </html>

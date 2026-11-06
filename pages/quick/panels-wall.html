@@ -104,7 +104,8 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
             </div>
             <label class="field is-hidden" id="veneerBCutField">
               <span class="field__label">Тип рисунка обратной стороны</span>
-              <select id="veneerBCutSelect"><option value="">Выберите тип рисунка</option></select>
+              <select id="veneerBCutSelect" aria-describedby="veneerBCutHint"><option value="">Выберите тип рисунка</option></select>
+              <span class="field__note" id="veneerBCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
               <span class="field__error" id="veneerBCutError"></span>
             </label>
             <label class="field is-hidden" id="veneerBRoughThicknessField">
@@ -116,18 +117,19 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
           <div class="field-grid field-grid--two is-hidden" id="veneerLayoutGrid">
             <label class="field is-hidden" id="veneerCutField">
               <span class="field__label">Тип рисунка</span>
-              <select id="veneerCutSelect"><option value="">Выберите тип рисунка</option></select>
+              <select id="veneerCutSelect" aria-describedby="veneerCutHint"><option value="">Выберите тип рисунка</option></select>
+              <span class="field__note" id="veneerCutHint"><strong>Радиальный.</strong> Рисунок из ровных полос, спокойный и однородный.<br><strong>Тангенциальный.</strong> Рисунок из дуг и волн, яркий и живой. Листы не похожи друг на друга.</span>
               <span class="field__error" id="veneerCutError"></span>
             </label>
             <label class="field is-hidden" id="layoutField">
-              <span class="field__label">Раскладка, сторона А</span>
+              <span class="field__label">Раскладка</span>
               <select id="layoutSelect"><option value="">Выберите раскладку</option></select>
               <span class="field__error" id="layoutError"></span>
             </label>
           </div>
 
           <label class="field is-hidden" id="layoutBField">
-            <span class="field__label">Раскладка, обратная сторона</span>
+            <span class="field__label">Раскладка</span>
             <select id="layoutBSelect"><option value="">Как на стороне А</option></select>
           </label>
 
@@ -614,4 +616,4 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
         Расчёт является предварительным и не является публичной офертой.
       </p>
     </div>
-  </dialog><script src="../../vendor/pdfmake/pdfmake.min.js"></script><script src="../../vendor/pdfmake/vfs_fonts.js"></script><script src="../../js/core/panels-core.js"></script><script src="../../js/core/quick-common.js"></script><script src="../../js/core/specification-state.js"></script><script src="../../js/quick-panels.js?v=20261106-face-back-labels"></script><script src="../../js/detailed-panels.js?v=20261106-veneer-species-labels"></script></body></html>
+  </dialog><script src="../../vendor/pdfmake/pdfmake.min.js"></script><script src="../../vendor/pdfmake/vfs_fonts.js"></script><script src="../../js/core/panels-core.js"></script><script src="../../js/core/quick-common.js"></script><script src="../../js/core/specification-state.js"></script><script src="../../js/quick-panels.js?v=20261106-pattern-layout-labels"></script><script src="../../js/detailed-panels.js?v=20261106-pattern-layout-labels"></script></body></html>

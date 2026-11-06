@@ -9502,6 +9502,9 @@
   async function init() {
     try {
       const response = await fetch(DATA_URL); if (!response.ok) throw new Error(`HTTP ${response.status}`); data = await response.json();
+      const customLayout = data.layouts.find(layout => layout.id === "custom");
+      if (customLayout) customLayout.name = "Индивидуальная раскладка";
+      data.meta.customLayoutProductionCostNote = data.meta.customLayoutProductionCostNote?.replace("«По ТЗ»", "«Индивидуальная раскладка»");
       setupAutocomplete({
         input: form.veneerAInput,
         menu: form.veneerASuggestions,

@@ -250,7 +250,7 @@
   submitted=true;const issues=contact.validate();
   if(issues.length){$('saveStatus').textContent='Заполните обязательные контактные данные и согласие.';issues[0].input.focus();return;}
   if(!standard&&api.form.finishSelect.value===''){$('saveStatus').textContent='Выберите покрытие.';api.form.finishSelect.focus();return;}
-  if(!standard&&api.form.layoutSelect.value==='custom'&&!api.form.layoutTzFiles.files.length){$('saveStatus').textContent='Для раскладки по ТЗ приложите файл.';api.form.layoutTzFiles.focus();return;}
+  if(!standard&&api.form.layoutSelect.value==='custom'&&!api.form.layoutTzFiles.files.length){$('saveStatus').textContent='Для индивидуальной раскладки приложите файл.';api.form.layoutTzFiles.focus();return;}
   if(scenario==='details'&&$('boringSelect').value==='yes'&&!contact.fileNames().length){$('saveStatus').textContent='Для присадки приложите чертёж.';return;}
   // This is the detailed calculation's own validation and serialization, without writing a specification item.
   const record=api.capture();if(!record)return;
