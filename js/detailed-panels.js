@@ -5741,7 +5741,7 @@
           else standardFinalSubtotal += allocated;
         });
         breakdown.push({
-          label: `Готовая рубашка · сторона ${usage.which}`,
+          label: `Готовая рубашка · ${usage.which === "A" ? "лицевая сторона" : "обратная сторона"}`,
           value: finalPurchase.cost,
           note: `${usage.item.displayName} · ${totalSheets} целых полотен · ${round(paidAreaM2, 3)} м² × ${money(pricing.finalPricePerM2)}/м² · ${pricing.levelName}. Набор шпона не применяется.`
         });
@@ -7147,7 +7147,7 @@
 
     const label = document.createElement("span");
     label.className = "dynamic-adjustment-row__label";
-    const sideLabel = consumption.sideKey === "A+B" ? "стороны А и Б" : `сторона ${consumption.sideKey || consumption.which || "—"}`;
+    const sideLabel = consumption.sideKey === "A+B" ? "обе стороны" : (consumption.sideKey || consumption.which) === "A" ? "лицевая сторона" : "обратная сторона";
     const contextLabel = consumption.panelSize
       ? `${specNumber(num(consumption.panelSize.length), 0)} × ${specNumber(num(consumption.panelSize.width), 0)} мм`
       : consumption.pricingMode === "nonstandard" ? "нестандарт" : "стандарт по запросу";
@@ -7258,7 +7258,7 @@
       const key = `${pricing.which}|${pricing.levelId}`;
       if (veneerSeen.has(key)) return;
       veneerSeen.add(key);
-      const sideName = pricing.sameAsA ? "Шпон сторон А и Б" : `Шпон стороны ${pricing.which}`;
+      const sideName = pricing.sameAsA ? "Шпон обеих сторон" : `Шпон на ${pricing.which === "A" ? "лицевой стороне" : "обратной стороне"}`;
       renderPriceAdjustmentControl({
         name: `${sideName} — скидка по объёму`,
         percent: Number(pricing.automaticDiscountPercent || 0),
