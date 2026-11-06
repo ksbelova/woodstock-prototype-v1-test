@@ -6844,6 +6844,26 @@
       specRow("Фанерованные стороны", sideText)
     ];
 
+    if (isDetailedPanelCalculation()) {
+      characteristics.push(specRow("Лицевая сторона", isReadyShirt(veneerA) ? (veneerA?.displayName || "—") : veneerDisplayName(veneerA)));
+      if (veneerA?.typeName) characteristics.push(specRow("Тип шпона", veneerA.typeName, 1));
+      if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина", specMm(veneerThickness), 1));
+      if (cutA && !isReadyShirt(veneerA)) characteristics.push(specRow("Тип рисунка", cutA, 1));
+      if (layout?.name && needsLayoutSelection()) characteristics.push(specRow("Раскладка", layout.name, 1));
+      if (isReadyShirt(veneerA)) {
+        const dims = Core.readyShirtDimensions(veneerA);
+        if (dims) characteristics.push(specRow("Формат готовой рубашки", `${specNumber(dims.lengthMm, 0)} × ${specNumber(dims.widthMm, 0)} мм`, 1));
+      }
+      const backName = sideBSelectionMode === "rough" ? "Черновой шпон"
+        : sideBSelectedMaterial ? (isReadyShirt(sideBSelectedMaterial) ? (sideBSelectedMaterial.displayName || "—") : veneerDisplayName(sideBSelectedMaterial)) : sideBMode;
+      characteristics.push(specRow("Обратная сторона", backName));
+      if (sides === 2) {
+        if (!isReadyShirt(sideBSelectedMaterial) && sideBSelectedMaterial?.typeName) characteristics.push(specRow("Тип шпона", sideBSelectedMaterial.typeName, 1));
+        if (Number.isFinite(sideBThickness)) characteristics.push(specRow("Толщина", specMm(sideBThickness), 1));
+        if (sideBPatternName && !isReadyShirt(sideBSelectedMaterial) && sideBSelectionMode !== "rough") characteristics.push(specRow("Тип рисунка", sideBPatternName, 1));
+        if (sideBNeedsLayout()) characteristics.push(specRow("Раскладка", data.layouts.find(x => x.id === effectiveLayoutBId())?.name || "—", 1));
+      }
+    } else {
     if (isReadyShirt(veneerA)) {
       characteristics.push(specRow("Лицевая сторона", veneerA?.displayName || "—"));
       if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина материала лицевой стороны", `${specNumber(veneerThickness, 2)} мм`, 1));
@@ -6875,6 +6895,8 @@
       }
       if (Number.isFinite(sideBThickness)) characteristics.push(specRow("Толщина материала обратной стороны", `${specNumber(sideBThickness, 2)} мм`, 1));
       if (sideBPatternName && !isReadyShirt(sideBSelectedMaterial)) characteristics.push(specRow("Тип рисунка обратной стороны", sideBPatternName, 1));
+    }
+
     }
 
     if (form.layoutTzComment.value.trim()) characteristics.push(specRow("Комментарий к раскладке", form.layoutTzComment.value.trim()));
