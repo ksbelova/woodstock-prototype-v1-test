@@ -3463,6 +3463,9 @@
     const allowanceNote = $('[data-size-allowance-note]', row);
     if (mode) updateManufacturingTypeOptions(row);
     const manufacturingType = manufacturingTypeForRow(row);
+    if (isDetailedPanelCalculation()) {
+      $(".standard-size-list--row", row)?.classList.toggle("is-hidden", manufacturingType === "exact");
+    }
     fields?.classList.toggle("is-hidden", !mode);
     manufacturingField?.classList.toggle("is-hidden", !mode);
     allowanceNote?.classList.toggle("is-hidden", manufacturingType !== "allowance20");
