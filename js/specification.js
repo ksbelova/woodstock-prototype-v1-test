@@ -327,7 +327,7 @@
   }
   function rowSpecificChange(source,event){
     if(productType!=='plate'||!records[editorIndex]||records[editorIndex].sizes.length<2)return false;
-    if(source.closest('[data-size-row],#positionFinishOverrides,#positionEdgeOverrides,#priceAdjustmentsList'))return false;
+    if(source.closest('[data-size-row],#positionFinishOverrides,#positionEdgeOverrides,#priceAdjustmentsList,#veneerConsumptionList'))return false;
     // Descriptions and uploaded documents belong to the calculation; per-row fields remain available separately.
     if(['commentInput','filesInput','layoutTzComment','layoutTzFiles'].includes(source.id))return false;
     if(event.type==='input'||event.type==='change')return source.type==='checkbox'||source.type==='radio'?source.checked!==event.target.checked:source.value!==event.target.value;
@@ -429,7 +429,7 @@
     }else{
       const row=doc.querySelectorAll('[data-size-row]')[rowIndex];
       set(1,sourceFields(['baseSelect','baseThicknessSelect']));
-      set(2,sourceFields(['veneerTypeSelect','veneerAInput','veneerThicknessSelect','veneeredSidesSelect','reverseSideSelect','veneerBModeSelect','veneerBInput','veneerBRoughThicknessSelect']));
+      set(2,sourceFields(['veneerTypeSelect','veneerAInput','veneerThicknessSelect','veneeredSidesSelect','reverseSideSelect','veneerBModeSelect','veneerBInput','veneerBRoughThicknessSelect'])+widget(doc.getElementById('veneerConsumptionList')));
       set(3,sourceFields(['layoutSelect','layoutBSelect','veneerCutSelect','veneerBCutSelect','layoutTzComment','layoutTzFiles'])+fileOutput(doc.getElementById('layoutTzFiles'),doc.getElementById('layoutTzFileNames')));
       set(4,widget(row?.querySelector('.standard-size-list'))+sizeFields(row,'[data-size-manufacturing]')+sizeFields(row,'[data-size-manufacturing-type]')+widget(row?.querySelector('[data-size-fields]')));
       set(5,sourceFields(['edgeModeSelect','calibrationSelect','calibrationTargetInput','finishSelect','lacquerExecutionSelect','lacquerGlossSelect','lacquerProcessSelect','enamelVariantSelect','finishSidesSelect','toningSelect','isolatorSelect'])+widget(doc.getElementById('positionFinishToggle'))+widget(doc.querySelector('[data-position-finish-row="'+row?.dataset.rowId+'"]'))+sizeFields(row,'[data-size-transition]'));
@@ -526,7 +526,7 @@
       if(sourceType==='input'&&source.type!=='file')pendingChanges.add(target.dataset.specSource);
       else if(sourceType==='change')pendingChanges.delete(target.dataset.specSource);
       source.dispatchEvent(new SourceEvent(sourceType,{bubbles:true}));
-      if(!(sourceType==='input'&&source.closest('#priceAdjustmentsList')))refreshPlateGroup();
+      if(!(sourceType==='input'&&source.closest('#priceAdjustmentsList,#veneerConsumptionList')))refreshPlateGroup();
       renderKeepingFocus();
     }catch(error){status('Не удалось изменить поле: '+error.message);}
   }

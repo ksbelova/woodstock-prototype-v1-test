@@ -1138,6 +1138,12 @@
 
   function arrangeDetailedSideFields() {
     if (!isDetailedPanelCalculation()) return;
+    if (!el("veneerConsumptionList")) {
+      const list = document.createElement("div");
+      list.id = "veneerConsumptionList";
+      list.className = "dynamic-adjustments";
+      form.veneerTypeSelect.closest("section").append(list);
+    }
     const baseBlock = form.baseSelect.closest("section");
     baseBlock.append(form.calibrationFields);
     let purchaseNote = el("calibrationPurchaseReviewNote");
@@ -7271,11 +7277,12 @@
     }
 
     wrapper.append(label, right);
-    form.priceAdjustmentsList.append(wrapper);
+    (isDetailedPanelCalculation() ? el("veneerConsumptionList") : form.priceAdjustmentsList).append(wrapper);
   }
 
   function renderPriceAdjustments(result) {
     form.priceAdjustmentsList.replaceChildren();
+    if (isDetailedPanelCalculation()) el("veneerConsumptionList")?.replaceChildren();
     let rowCount = 0;
 
     const veneerSeen = new Set();
@@ -7344,7 +7351,7 @@
         return;
       }
       renderVeneerWasteAdjustmentControl(consumption);
-      rowCount += 1;
+      if (!isDetailedPanelCalculation()) rowCount += 1;
     });
 
     const thickWork = result?.thickVeneerWorkAdjustment;
@@ -7543,7 +7550,7 @@
     // предварительной, но не блокирует PDF с неучтённой стоимостью шпона.
     const invalidVeneerConsumption = (result?.veneerConsumptions || []).find(isBlockingVeneerConsumption);
     if (invalidVeneerConsumption) {
-      add(`veneerActual:${invalidVeneerConsumption.id || invalidVeneerConsumption.materialId || "current"}`, "фактическое количество шпона", form.priceAdjustmentsBlock,
+      add(`veneerActual:${invalidVeneerConsumption.id || invalidVeneerConsumption.materialId || "current"}`, "фактическое количество шпона", isDetailedPanelCalculation() ? el("veneerConsumptionList") : form.priceAdjustmentsBlock,
         invalidVeneerConsumption.validationError || "Укажите фактическое количество шпона.", null, "block");
     }
 
