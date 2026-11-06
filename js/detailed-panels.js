@@ -374,7 +374,7 @@
     return sideBNeedsLayout() && Boolean(definition?.requiresProductionCost);
   }
 
-  function sandingEnabled() { return window.WoodstockPanelsView?.automaticOperations || form.sandingSelect?.value !== "no"; }
+  function sandingEnabled() { return isDetailedPanelCalculation() || window.WoodstockPanelsView?.automaticOperations || form.sandingSelect?.value !== "no"; }
 
   function selectedLayout() {
     const layoutId = effectiveLayoutId();
@@ -1138,6 +1138,19 @@
 
   function arrangeDetailedSideFields() {
     if (!isDetailedPanelCalculation()) return;
+    const baseBlock = form.baseSelect.closest("section");
+    baseBlock.append(form.calibrationFields);
+    let purchaseNote = el("calibrationPurchaseReviewNote");
+    if (!purchaseNote) {
+      purchaseNote = document.createElement("p");
+      purchaseNote.id = "calibrationPurchaseReviewNote";
+      purchaseNote.className = "field-warning is-hidden";
+      purchaseNote.textContent = "Внутренняя пометка · проверить: калибровка фанеры и ДСП считается отдельной услугой. Уточнить, включена ли она в закупочную стоимость основы, чтобы исключить двойной учёт.";
+    }
+    baseBlock.append(purchaseNote);
+    form.techVeneeringSummary.closest("section").hidden = true;
+    form.sandingSelect.value = "yes";
+    form.sandingSelect.disabled = true;
     let backGrid = el("backVeneerLayoutGrid");
     if (!backGrid) {
       backGrid = document.createElement("div");
@@ -2345,7 +2358,12 @@
     return calibrationConfigForBase(base)?.available === true;
   }
 
+  function separatelyPricedCalibration(base = selectedBase()) {
+    return isDetailedPanelCalculation() && (base?.id === "dsp" || base?.id?.startsWith("plywood_"));
+  }
+
   function calibrationRequiredForBase(base = selectedBase()) {
+    if (separatelyPricedCalibration(base)) return false;
     return calibrationConfigForBase(base)?.required === true;
   }
 
@@ -2451,7 +2469,8 @@
   function updateCalibrationUI() {
     const base = selectedBase();
     if (gspCalibrationIncluded(base)) {
-      form.calibrationFields?.classList.remove("is-hidden");
+      form.calibrationFields?.classList.add("is-hidden");
+      el("calibrationPurchaseReviewNote")?.classList.add("is-hidden");
       form.calibrationSelect.value = "yes";
       form.calibrationSelect.disabled = true;
       form.calibrationSelect.classList.add("is-hidden");
@@ -2469,6 +2488,7 @@
     const available = calibrationAvailableForBase(base);
     const required = calibrationRequiredForBase(base);
     form.calibrationFields?.classList.toggle("is-hidden", !available);
+    el("calibrationPurchaseReviewNote")?.classList.toggle("is-hidden", !separatelyPricedCalibration(base));
 
     if (!available) {
       form.calibrationSelect.disabled = false;
@@ -2497,7 +2517,7 @@
     const active = available && form.calibrationSelect.value === "yes";
     form.calibrationRequiredNote?.classList.toggle("is-hidden", !required);
     form.calibrationTargetField.classList.toggle("is-hidden", !active);
-    form.calibrationDepthField?.classList.toggle("is-hidden", !active);
+    form.calibrationDepthField?.classList.toggle("is-hidden", isDetailedPanelCalculation() || !active);
     if (!active) {
       clearValidationFor(form.calibrationTargetInput, "calibrationTarget", form.calibrationTargetError);
     } else syncCalibrationDepthInput();
@@ -6098,8 +6118,8 @@
         warnings.push("Для калибровки не задана базовая ставка за 1 мм съёма.");
         hasPartialPrice = true;
       } else {
-        const calibrationSizes = validSizes.filter((size) => !manufacturingCostFromProduction(size));
-        calibrationProductionArea = validSizes.filter(manufacturingCostFromProduction).reduce((sum, size) => sum + (size.calcArea || size.area), 0);
+        const calibrationSizes = validSizes.filter((size) => separatelyPricedCalibration(base) || !manufacturingCostFromProduction(size));
+        calibrationProductionArea = validSizes.filter(size => !separatelyPricedCalibration(base) && manufacturingCostFromProduction(size)).reduce((sum, size) => sum + (size.calcArea || size.area), 0);
         calibrationRequiresProductionCost = calibrationProductionArea > 0;
         const warehouseArea = calibrationSizes.filter((x) => classifySize(x).id === "warehouse_standard").reduce((sum, x) => sum + (x.calcArea || x.area), 0);
         const requestArea = calibrationSizes.filter((x) => classifySize(x).id === "standard_request").reduce((sum, x) => sum + (x.calcArea || x.area), 0);
@@ -9124,6 +9144,7 @@
       },
       technologicalOperations: lastCalculation.techOperations,
       calibration: {
+        separatelyPriced: separatelyPricedCalibration(),
         enabled: lastCalculation.techOperations?.calibration === true,
         required: lastCalculation.techOperations?.calibrationRequired === true,
         sourceBaseThicknessMm: Number.isFinite(lastCalculation.techOperations?.calibrationSourceBaseThicknessMm) ? lastCalculation.techOperations.calibrationSourceBaseThicknessMm : null,
