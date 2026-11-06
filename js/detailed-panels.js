@@ -1138,6 +1138,23 @@
 
   function arrangeDetailedSideFields() {
     if (!isDetailedPanelCalculation()) return;
+    const descriptions = [
+      [form.calibrationSelect, "calibrationDefinition", "Калибровка основы. Шлифовка основы до точной толщины, чтобы готовая деталь со шпоном получилась нужного размера."],
+      [form.finishSelect, "finishDefinition", "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.\nЛак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.\nЭмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру."],
+      [form.toningSelect, "toningDefinition", "Тонировка меняет оттенок шпона под нужный цвет и сохраняет его рисунок. Подбираем по образцу, цвет согласуем с вами до запуска производства."]
+    ];
+    descriptions.forEach(([control, id, text]) => {
+      let note = el(id);
+      if (!note) { note = document.createElement("span"); note.id = id; note.className = "field__note"; control.after(note); }
+      note.textContent = text;
+      note.style.whiteSpace = "pre-line";
+      control.setAttribute("aria-describedby", [control.getAttribute("aria-describedby"), id].filter(Boolean).join(" ").split(/\s+/).filter((item,index,all)=>all.indexOf(item)===index).join(" "));
+    });
+    Array.from(form.veneeredSidesSelect.options).forEach(option => {
+      if (option.value === "1") option.textContent = "С одной стороны";
+      if (option.value === "2") option.textContent = "С двух сторон";
+    });
+    form.separateEdgeSidesSelect.closest(".field")?.classList.add("is-hidden");
     if (!el("veneerConsumptionList")) {
       const list = document.createElement("div");
       list.id = "veneerConsumptionList";
@@ -2008,7 +2025,7 @@
   function validateSeparateEdgeMetersOnBlur() {
     if (form.edgeModeSelect.value !== "separate") return true;
     const raw = form.separateEdgeMetersInput.value.trim();
-    if (isQuickStandardPanel()) {
+    if (isQuickStandardPanel() || isDetailedPanelCalculation()) {
       separateEdgeMetersManual = true;
       markFieldTouched("separateEdgeMeters");
       const value = num(raw);
@@ -4019,7 +4036,7 @@
   }
 
   function separateEdgeAutomaticMeters() {
-    if (isQuickStandardPanel()) return 0;
+    if (isQuickStandardPanel() || isDetailedPanelCalculation()) return 0;
     const sides = form.separateEdgeSidesSelect?.value || "perimeter";
     return readSizeRows().filter((size) => size.mode && size.quantityValid && size.physicalSizeValid && size.length > 0 && size.width > 0 && size.quantity > 0)
       .reduce((sum, size) => sum + geometricEdgeMetersForSize(size, sides), 0);
@@ -4027,7 +4044,7 @@
 
   function syncSeparateEdgeMeters() {
     if (!form.separateEdgeMetersInput) return;
-    if (isQuickStandardPanel()) {
+    if (isQuickStandardPanel() || isDetailedPanelCalculation()) {
       separateEdgeMetersManual = true;
       form.separateEdgeMetersReset?.classList.add("is-hidden");
       if (form.separateEdgeMetersSummary) form.separateEdgeMetersSummary.textContent = "Минимальный заказ кромки 50 пог. м";
@@ -6025,10 +6042,10 @@
         ...edge,
         ...selection,
         comment: form.edgeCommentInput.value.trim(),
-        sidesId: isQuickStandardPanel() ? null : form.separateEdgeSidesSelect.value,
-        sidesName: isQuickStandardPanel() ? "" : edgeRuleById(form.separateEdgeSidesSelect.value)?.name || "",
+        sidesId: isQuickStandardPanel() || isDetailedPanelCalculation() ? null : form.separateEdgeSidesSelect.value,
+        sidesName: isQuickStandardPanel() || isDetailedPanelCalculation() ? "" : edgeRuleById(form.separateEdgeSidesSelect.value)?.name || "",
         geometricMeters: separateEdgeAutomaticMeters(),
-        calculatedMeters: isQuickStandardPanel() ? orderEdgeMeters : separateEdgeAutomaticMeters(),
+        calculatedMeters: isQuickStandardPanel() || isDetailedPanelCalculation() ? orderEdgeMeters : separateEdgeAutomaticMeters(),
         metersSource: separateEdgeMetersManual ? "manual" : "automatic",
         reserveCoefficient: 1,
         orderedMeters: Number.isFinite(meters) ? meters : null,
@@ -6926,6 +6943,8 @@
             2
           ));
         });
+      } else if (isDetailedPanelCalculation() && Number.isFinite(edge.orderedMeters) && edge.orderedMeters > 0) {
+        characteristics.push(specRow("Метраж к заказу", `${specNumber(edge.orderedMeters, 2)} пог. м`, 1));
       } else if (Number.isFinite(edge.orderedMeters) && edge.orderedMeters > 0) {
         characteristics.push(specRow("Стороны для расчёта кромки", edge.sidesName || "—", 1));
         characteristics.push(specRow("Расчётный метраж кромки", `${specNumber(edge.calculatedMeters, 2)} пог. м`, 1));
