@@ -386,6 +386,8 @@
   const STANDARD_LACQUER_EXECUTION = "standard";
   const GLOSS_100_EXECUTION = "gloss100";
 
+  const coatingSchemeDescription = "Грунт + лак. Базовое покрытие, структура древесины ощущается под рукой. Для стеновых панелей и декоративных элементов.\nГрунт + грунт + лак. Поверхность ровнее, поры почти не видны. Для мебели и фасадов.\nГрунт + грунт + лак +лак. Самая ровная поверхность и самый плотный защитный слой. Для фасадов и столешниц с активной нагрузкой.\nЧем больше слоёв, тем ровнее поверхность, плотнее защита и выше цена. Если клиент не уточнял, выбирайте «Грунт и лак».";
+
   function finishDescription(id) {
     return {
       lacquer_acrylic: "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.",
@@ -666,7 +668,7 @@
         issues.push({ field: "gloss", message: "Выберите степень блеска." });
       }
       if (isAcrylicLacquer(normalized.finishId) && !normalized.lacquerProcess) {
-        issues.push({ field: "process", message: "Выберите технологическую схему лака." });
+        issues.push({ field: "process", message: "Выберите схему покрытия." });
       }
     }
     if (normalized.finishId === "enamel" && !normalized.enamelVariant) {
@@ -1148,7 +1150,9 @@
 
   function arrangeDetailedSideFields() {
     if (!isDetailedPanelCalculation()) return;
+    form.lacquerProcessField?.querySelector(".field__label") && (form.lacquerProcessField.querySelector(".field__label").textContent = "Схема покрытия");
     const descriptions = [
+      [form.lacquerProcessSelect, "coatingSchemeDefinition", coatingSchemeDescription],
       [form.calibrationSelect, "calibrationDefinition", "Калибровка основы. Шлифовка основы до точной толщины, чтобы готовая деталь со шпоном получилась нужного размера."],
       [form.finishSelect, "finishDefinition", "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.\nЛак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.\nЭмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру."],
       [form.isolatorSelect, "isolatorDefinition", "Изолятор. Защитный слой под лаком. Нужен для пород с маслом или смолой в древесине: без него они проступают сквозь лак пятнами."],
@@ -8189,7 +8193,7 @@
     const current = form.lacquerProcessSelect.value;
     const options = availableLacquerProcesses(form.finishSidesSelect.value);
     form.lacquerProcessSelect.innerHTML = "";
-    form.lacquerProcessSelect.add(new Option("Выберите технологическую схему", ""));
+    form.lacquerProcessSelect.add(new Option("Выберите схему покрытия", ""));
     options.forEach((item) => form.lacquerProcessSelect.add(new Option(item.name, item.id)));
     if (options.some((item) => item.id === current)) form.lacquerProcessSelect.value = current;
     else form.lacquerProcessSelect.value = "";
@@ -8305,7 +8309,7 @@
       const glossOptions = lacquer && !gloss100 ? lacquerGlossOptions(finishId) : [];
       const lacquerProcesses = acrylic ? availableLacquerProcesses(state.sides) : [];
       const glossHtml = [`<option value="">Выберите степень блеска</option>`, ...glossOptions.map((value) => `<option value="${esc(value)}"${state.lacquerGloss === value ? " selected" : ""}>${esc(value)}</option>`)].join("");
-      const processHtml = [`<option value="">Выберите технологическую схему</option>`, ...lacquerProcesses.map((item) => `<option value="${esc(item.id)}"${state.lacquerProcess === item.id ? " selected" : ""}>${esc(item.name)}</option>`)].join("");
+      const processHtml = [`<option value="">Выберите схему покрытия</option>`, ...lacquerProcesses.map((item) => `<option value="${esc(item.id)}"${state.lacquerProcess === item.id ? " selected" : ""}>${esc(item.name)}</option>`)].join("");
       const enamelHtml = [`<option value="">Выберите технологическую схему</option>`, ...(data.finishParameters.enamelVariants || []).map((value) => `<option value="${esc(value)}"${state.enamelVariant === value ? " selected" : ""}>${esc(value)}</option>`)].join("");
 
       return `<div class="finish-position-card" data-position-finish-row="${esc(rowId)}">
@@ -8322,7 +8326,7 @@
         ${finishId === "lacquer_polyester" ? `<label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss disabled><option value="100%">100%</option></select></label>` : ""}
         ${!gloss100 ? `<div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss>${glossHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-gloss-error></span></label>
-          ${acrylic ? `<label class="field"><span class="field__label">Технологическая схема лака</span><select data-position-lacquer-process>${processHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-process-error></span></label>` : ""}
+          ${acrylic ? `<label class="field"><span class="field__label">Схема покрытия</span><select data-position-lacquer-process>${processHtml}</select><span class="field__note" style="white-space:pre-line">${esc(coatingSchemeDescription)}</span><span class="field__error is-hidden" data-validation-error data-position-lacquer-process-error></span></label>` : ""}
         </div>` : ""}
         <div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Тонировка</span><select data-position-toning><option value="no"${state.toning !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.toning === "yes" ? " selected" : ""}>Да</option></select></label>
