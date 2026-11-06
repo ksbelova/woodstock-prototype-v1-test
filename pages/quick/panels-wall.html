@@ -31,7 +31,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
         </section>
 
         <section class="form-block">
-          <h2>Фанеровка</h2>
+          <h2>Шпон</h2>
 
           <div class="field-grid field-grid--two">
             <label class="field" id="veneerTypeField">
@@ -45,7 +45,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
               <label class="field__label" id="veneerAInputLabel" for="veneerAInput">Порода на лицевой стороне</label>
               <div class="autocomplete-control">
                 <input id="veneerAInput" type="text" autocomplete="off" placeholder="Введите наименование шпона" aria-controls="veneerASuggestions" aria-expanded="false" />
-                <button class="autocomplete-clear is-hidden" id="veneerAClear" type="button" aria-label="Очистить материал стороны А">×</button>
+                <button class="autocomplete-clear is-hidden" id="veneerAClear" type="button" aria-label="Очистить материал лицевой стороны">×</button>
                 <div class="autocomplete-menu is-hidden" id="veneerASuggestions" role="listbox"></div>
               </div>
               <span class="field__error" id="veneerAError"></span>
@@ -59,7 +59,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
               <span class="field__error" id="veneerThicknessError"></span>
               <span class="field__note is-hidden" id="quickWallPaperHint" aria-live="polite"></span>
               <span class="field__note is-hidden" id="quickWallBackExplanation" aria-live="polite"></span>
-              <span class="prototype-review-note is-hidden" id="quickCompensatorReviewNote" role="note"><strong>Внутренняя пометка · согласовать с Александром.</strong> Для лицевого шпона 2 и 2,5 мм на обратной стороне сейчас используется та же позиция шпона и та же цена, что на стороне А. Нужно утвердить постоянное правило выбора компенсатора и цену для небольших заказов.</span>
+              <span class="prototype-review-note is-hidden" id="quickCompensatorReviewNote" role="note"><strong>Внутренняя пометка · согласовать с Александром.</strong> Для лицевого шпона 2 и 2,5 мм на обратной стороне сейчас используется та же позиция шпона и та же цена, что на лицевой стороне. Нужно утвердить постоянное правило выбора компенсатора и цену для небольших заказов.</span>
               <span class="prototype-review-note is-hidden" id="quickRoughOneMmReviewNote" role="note"><strong>Внутренняя пометка · согласовать с Александром.</strong> При толщине шпона на лицевой стороне 1 мм на обратной стороне временно используется черновой шпон толщиной 1 мм по ставке 440 ₽/м² — как для 1,5 мм. Нужно подтвердить толщину и тариф чернового шпона 1 мм, а также выяснить, нужна ли отдельная производственная доплата за лицевой шпон 1 мм и как её рассчитывать. Сейчас отдельная доплата не добавляется.</span>
             </label>
 
@@ -87,7 +87,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
             <label class="field">
               <span class="field__label">Порода на обратной стороне</span>
               <select id="veneerBModeSelect">
-                <option value="same">Такой же, как сторона А</option>
+                <option value="same">Такой же, как лицевая сторона</option>
                 <option value="other">Другой материал</option>
                 <option value="rough" hidden disabled>Черновой шпон</option>
               </select>
@@ -130,7 +130,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
 
           <label class="field is-hidden" id="layoutBField">
             <span class="field__label">Раскладка</span>
-            <select id="layoutBSelect"><option value="">Как на стороне А</option></select>
+            <select id="layoutBSelect"><option value="">Как на лицевой стороне</option></select>
           </label>
 
           <div class="conditional-block is-hidden" id="layoutTzFields">
@@ -200,7 +200,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
                   <button class="autocomplete-clear is-hidden" id="edgeMaterialClear" type="button" aria-label="Очистить наименование кромки">×</button>
                   <div class="autocomplete-menu is-hidden" id="edgeMaterialSuggestions" role="listbox"></div>
                 </div>
-                <span class="field__note">Подставляется по шпону стороны А. Можно выбрать другой материал. Цена берётся из прайса кромки.</span>
+                <span class="field__note">Подставляется по шпону лицевой стороны. Можно выбрать другой материал. Цена берётся из прайса кромки.</span>
                 <span class="field__error" id="edgeMaterialError"></span>
               </div>
 
@@ -273,7 +273,7 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
                   <button class="autocomplete-clear is-hidden" id="separateEdgeMaterialClear" type="button" aria-label="Очистить наименование кромки">×</button>
                   <div class="autocomplete-menu is-hidden" id="separateEdgeMaterialSuggestions" role="listbox"></div>
                 </div>
-                <span class="field__note">Подставляется по шпону стороны А. Можно выбрать другой материал. Цена берётся из прайса кромки.</span>
+                <span class="field__note">Подставляется по шпону лицевой стороны. Можно выбрать другой материал. Цена берётся из прайса кромки.</span>
                 <span class="field__error" id="separateEdgeMaterialError"></span>
               </div>
 
@@ -616,4 +616,4 @@ body[data-panel-scenario="wall"] [data-size-extra] {display:none!important}
         Расчёт является предварительным и не является публичной офертой.
       </p>
     </div>
-  </dialog><script src="../../vendor/pdfmake/pdfmake.min.js"></script><script src="../../vendor/pdfmake/vfs_fonts.js"></script><script src="../../js/core/panels-core.js"></script><script src="../../js/core/quick-common.js"></script><script src="../../js/core/specification-state.js"></script><script src="../../js/quick-panels.js?v=20261106-edge-glue-rules"></script><script src="../../js/detailed-panels.js?v=20261106-panel-side-terms-complete"></script></body></html>
+  </dialog><script src="../../vendor/pdfmake/pdfmake.min.js"></script><script src="../../vendor/pdfmake/vfs_fonts.js"></script><script src="../../js/core/panels-core.js"></script><script src="../../js/core/quick-common.js"></script><script src="../../js/core/specification-state.js"></script><script src="../../js/quick-panels.js?v=20261106-veneer-heading-front-hints"></script><script src="../../js/detailed-panels.js?v=20261106-veneer-heading-front-hints"></script></body></html>

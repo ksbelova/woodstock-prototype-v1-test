@@ -358,7 +358,7 @@
     const type = materialTypeOf(material);
     const previous = form.layoutBSelect.value;
     const allowed = allowedLayoutsForType(type);
-    form.layoutBSelect.replaceChildren(new Option("Как на стороне А", ""));
+    form.layoutBSelect.replaceChildren(new Option("Как на лицевой стороне", ""));
     allowed.forEach(item => form.layoutBSelect.add(new Option(item.name, item.id)));
     if (visible && allowed.some(item => item.id === previous)) form.layoutBSelect.value = previous;
     else form.layoutBSelect.value = "";
@@ -550,7 +550,7 @@
     form.veneerSideBGrid.classList.toggle("is-hidden", !paperAllowed);
     form.veneerBFields.setAttribute("data-quick-hidden", "");
     form.layoutBField?.setAttribute("data-quick-hidden", "");
-    // Для 2 и 2,5 мм на обратную сторону идёт шпон стороны А.
+    // Для 2 и 2,5 мм на обратную сторону идёт шпон лицевой стороны.
     form.veneerBModeSelect.value = "same";
     selectedVeneerBGroup = null;
     selectedVeneerB = null;
@@ -1249,7 +1249,7 @@
 
   // Временное решение команды до подтверждения WOODSTOCK:
   // при лицевом шпоне 2/2,5 мм стеновой панели обратная сторона = та же позиция,
-  // что сторона А, с той же ценой вместо более дешёвого компенсатора.
+  // что лицевая сторона, с той же ценой вместо более дешёвого компенсатора.
   function quickWallUsesFaceVeneerCompensator() {
     if (!isQuickWallPanel()) return false;
     const thickness = selectedVeneerThickness();
@@ -1264,7 +1264,7 @@
     if (!sameOption) return;
     sameOption.textContent = backsideCategoryBRequired(selectedVeneerA || selectedVeneerAGroup)
       ? "Та же порода, категория B"
-      : "Такой же, как сторона А";
+      : "Такой же, как лицевая сторона";
   }
 
   function backsideBVariantFor(item) {
@@ -2307,7 +2307,7 @@
       form.veneerBInput.value = "";
       form.veneerBError.textContent = isReadyShirt(selectedVeneerA || selectedVeneerAGroup)
         ? "Для выбора другого материала необходимо указать подтверждённую толщину готовой рубашки"
-        : "Для выбора другого материала необходимо указать подтверждённую толщину стороны А.";
+        : "Для выбора другого материала необходимо указать подтверждённую толщину лицевой стороны.";
       syncVeneerBCutUI(false);
       recalc();
       return;
@@ -4594,8 +4594,8 @@
     if (!form.veneerTypeSelect.value) warnings.push("Не выбран тип материала.");
     if (form.veneerTypeSelect.value && form.veneerTypeSelect.value !== "ready_shirt" && !validateVeneerThickness()) warnings.push("Не выбрана доступная толщина лицевого шпона.");
     if (!selectedVeneerAGroup) warnings.push(form.veneerAInput.value.trim()
-      ? (selectedMaterialType() === "ready_shirt" ? "Выберите точную готовую рубашку из справочника." : "Выберите точное наименование шпона стороны А из отфильтрованного справочника.")
-      : (selectedMaterialType() === "ready_shirt" ? "Не выбрана готовая рубашка." : "Не выбран шпон стороны А."));
+      ? (selectedMaterialType() === "ready_shirt" ? "Выберите точную готовую рубашку из справочника." : "Выберите точное наименование шпона лицевой стороны из отфильтрованного справочника.")
+      : (selectedMaterialType() === "ready_shirt" ? "Не выбрана готовая рубашка." : "Не выбран шпон лицевой стороны."));
     clearPatternTypeError("A");
     clearPatternTypeError("B");
     if (layoutSelectionRequired && rawLayout && !layoutAllowed) warnings.push("Выбранная раскладка недоступна для мультишпона.");
@@ -4817,8 +4817,8 @@
 
         if (layout === "herringbone" && !manufacturingCostFromProduction(size)) {
           const rate = num(data.meta.herringboneWorkSurchargePerM2);
-          if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: "Ёлочка · сторона А", value: cost, note: `${money(rate)}/м².` }); }
-          else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка ёлочки стороны А."); }
+          if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: "Ёлочка · лицевая сторона", value: cost, note: `${money(rate)}/м².` }); }
+          else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка ёлочки лицевой стороны."); }
         }
         if (classification.id === "standard_request" && sideBNeedsLayout() && ["diagonal45", "herringbone"].includes(layoutB) && !manufacturingCostFromProduction(size)) {
           const rate = num(layoutB === "herringbone" ? data.meta.herringboneWorkSurchargePerM2 : data.meta.diagonalWorkSurchargePerM2);
@@ -5373,7 +5373,7 @@
       const sameVeneerOnB = requiredB > 0 && sides === 2 && form.veneerBModeSelect.value === "same";
 
       if (sameVeneerOnB && backsideCategoryBRequired(selectedVeneerA)) {
-        addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон стороны А${contextLabel}`, false, pricingMode);
+        addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон лицевой стороны${contextLabel}`, false, pricingMode);
         const backB = backsideBVariantFor(selectedVeneerA);
         if (backB) addVeneerComponent(backB, requiredB, "B", `Шпон обратной стороны (категория B)${contextLabel}`, false, pricingMode);
         else {
@@ -5383,7 +5383,7 @@
       } else if (sameVeneerOnB && layout === layoutB) {
         addVeneerComponent(selectedVeneerA, requiredA + requiredB, "A", `Шпон сторон А и Б${contextLabel}`, true, pricingMode);
       } else {
-        if (requiredA > 0) addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон стороны А${contextLabel}`, false, pricingMode);
+        if (requiredA > 0) addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон лицевой стороны${contextLabel}`, false, pricingMode);
         if (requiredB > 0 && (sameVeneerOnB ? faceVeneerBItem : selectedVeneerB)) addVeneerComponent(sameVeneerOnB ? faceVeneerBItem : selectedVeneerB, requiredB, "B", `Шпон обратной стороны${contextLabel}`, false, pricingMode);
       }
     };
@@ -5426,7 +5426,7 @@
       if (item.veneerSheetBasedA) {
         addStandardSheetGroupRow({
           item: selectedVeneerA, which: "A", surfaceCount: 1,
-          label: "Шпон стороны А · стандарт по запросу", row: item
+          label: "Шпон лицевой стороны · стандарт по запросу", row: item
         });
       }
       if (item.veneerSheetBasedB && faceVeneerBItem) {
@@ -6813,15 +6813,15 @@
     ];
 
     if (isReadyShirt(veneerA)) {
-      characteristics.push(specRow("Сторона А", veneerA?.displayName || "—"));
-      if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина материала стороны А", `${specNumber(veneerThickness, 2)} мм`, 1));
+      characteristics.push(specRow("Лицевая сторона", veneerA?.displayName || "—"));
+      if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина материала лицевой стороны", `${specNumber(veneerThickness, 2)} мм`, 1));
       const dims = Core.readyShirtDimensions(veneerA);
       if (dims) characteristics.push(specRow("Формат готовой рубашки", `${specNumber(dims.lengthMm, 0)} × ${specNumber(dims.widthMm, 0)} мм`, 1));
     } else {
-      characteristics.push(specRow("Сторона А", veneerDisplayName(veneerA)));
-      if (veneerA?.typeName) characteristics.push(specRow("Тип шпона стороны А", veneerA.typeName, 1));
-      if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина шпона стороны А", `${specNumber(veneerThickness, 2)} мм`, 1));
-      if (cutA) characteristics.push(specRow("Тип рисунка стороны А", cutA, 1));
+      characteristics.push(specRow("Лицевая сторона", veneerDisplayName(veneerA)));
+      if (veneerA?.typeName) characteristics.push(specRow("Тип шпона лицевой стороны", veneerA.typeName, 1));
+      if (Number.isFinite(veneerThickness)) characteristics.push(specRow("Толщина шпона лицевой стороны", `${specNumber(veneerThickness, 2)} мм`, 1));
+      if (cutA) characteristics.push(specRow("Тип рисунка лицевой стороны", cutA, 1));
     }
 
     if (layout?.name && needsLayoutSelection()) characteristics.push(specRow("Раскладка А", layout.name));

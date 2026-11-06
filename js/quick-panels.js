@@ -92,7 +92,7 @@
   };
   if(wall){
    note('quickOnePointFiveReviewNote','veneerThicknessSelect','Для стеновых панелей при толщине шпона на лицевой стороне 1,5 мм принят шпон с одной стороны и черновой шпон на обороте. Итоговый вариант нужно сообщить производству: ранее на встрече звучало правило о шпоне с двух сторон от 1,5 мм.',faceSelected&&Math.abs(face-1.5)<0.001);
-   note('quickTwoMmFinishReviewNote','veneerThicknessSelect','При толщине шпона на лицевой стороне 2 мм покрытие считается только по стороне А, по аналогии с 2,5 мм. Применимость этого правила к 2 мм отдельно не подтверждена.',faceSelected&&Math.abs(face-2)<0.001);
+   note('quickTwoMmFinishReviewNote','veneerThicknessSelect','При толщине шпона на лицевой стороне 2 мм покрытие считается только по лицевой стороне, по аналогии с 2,5 мм. Применимость этого правила к 2 мм отдельно не подтверждена.',faceSelected&&Math.abs(face-2)<0.001);
    note('quickEdgeWidthReviewNote','edgeThicknessSelect','Правило подбора ближайшей ширины кромки с запасом минимум 4 мм к итоговой толщине изделия выведено командой из примеров производства. Формулировка правила требует подтверждения.');
    note('quickFinishDescriptionReviewNote','finishSelect','Описания свойств акрилового и полиуретанового лаков и эмали подготовлены командой по общим свойствам материалов. Их нужно сверить с покрытиями, которые использует Woodstock.',Boolean(finish)&&finish!=='none');
    note('quickPolyurethaneReviewNote','finishSelect','Для полиуретанового лака нет подтверждённого тарифа: его стоимость не входит в предварительную сумму. Нужно согласовать, оставлять ли этот вариант в кратком расчёте.',finish==='lacquer_polyurethane');
@@ -115,7 +115,7 @@
    const thickness=Number(form.veneerThicknessSelect.value);
    const two=Number(form.veneeredSidesSelect.value)===2;
    $('quickReverseSide').textContent=!form.veneerThicknessSelect.value?'—':two
-    ? 'тот же шпон, что и на стороне А'
+    ? 'тот же шпон, что и на лицевой стороне'
     : form.reverseSideSelect.value==='paper'?'бумага':'черновой шпон';
   }
   const certified=wall&&result?.base?.id==='gsp';
