@@ -947,7 +947,7 @@
     const type = selectedMaterialType();
     const isReady = type === "ready_shirt";
     form.veneerAInput.disabled = false;
-    if (form.veneerAInputLabel) form.veneerAInputLabel.textContent = isReady ? "Готовая рубашка" : (document.body.classList.contains("quick-panels-page") ? "Порода" : "Наименование шпона");
+    if (form.veneerAInputLabel) form.veneerAInputLabel.textContent = isReady ? "Готовая рубашка" : "Порода на лицевой стороне";
     form.veneerAInput.placeholder = isReady
       ? "Введите наименование или артикул готовой рубашки"
       : type
@@ -6789,10 +6789,10 @@
     characteristics.push(specRow("Обратная сторона", sideBMode));
     if (sides === 2) {
       if (sideBSelectionMode === "rough") {
-        characteristics.push(specRow("Материал обратной стороны", "Черновой шпон", 1));
+        characteristics.push(specRow("Порода на обратной стороне", "Черновой шпон", 1));
       } else if (sideBSelectedMaterial) {
         characteristics.push(specRow(
-          "Материал обратной стороны",
+          "Порода на обратной стороне",
           isReadyShirt(sideBSelectedMaterial) ? (sideBSelectedMaterial.displayName || "—") : veneerDisplayName(sideBSelectedMaterial),
           1
         ));
