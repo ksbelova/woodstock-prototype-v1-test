@@ -63,7 +63,7 @@
 
           <div class="field-grid field-grid--two is-hidden" id="veneerSelectionDetailsGrid">
             <label class="field is-hidden" id="veneerThicknessField">
-              <span class="field__label">Толщина лицевого шпона</span>
+              <span class="field__label">Толщина, мм</span>
               <select id="veneerThicknessSelect"></select>
               <span class="field__error" id="veneerThicknessError"></span>
             </label>
@@ -79,7 +79,7 @@
 
           <div class="field-grid field-grid--two is-hidden" id="veneerSideBGrid">
             <label class="field is-hidden" id="reverseSideField">
-              <span class="field__label">Сторона Б</span>
+              <span class="field__label">Обратная сторона</span>
               <select id="reverseSideSelect">
                 <option value="rough">Черновой шпон</option>
                 <option value="paper">Бумага</option>
@@ -90,7 +90,7 @@
 
           <div class="field-grid field-grid--two is-hidden" id="veneerBFields">
             <label class="field">
-              <span class="field__label">Материал стороны Б</span>
+              <span class="field__label">Материал обратной стороны</span>
               <select id="veneerBModeSelect">
                 <option value="same">Такой же, как сторона А</option>
                 <option value="other">Другой материал</option>
@@ -99,21 +99,21 @@
               <span class="field__error" id="veneerBModeHint"></span>
             </label>
             <div class="field autocomplete-field is-hidden" id="veneerBSearchField">
-              <label class="field__label" id="veneerBInputLabel" for="veneerBInput">Другой шпон — сторона Б</label>
+              <label class="field__label" id="veneerBInputLabel" for="veneerBInput">Другой шпон — обратная сторона</label>
               <div class="autocomplete-control">
                 <input id="veneerBInput" type="text" autocomplete="off" placeholder="Введите наименование материала" aria-controls="veneerBSuggestions" aria-expanded="false" />
-                <button class="autocomplete-clear is-hidden" id="veneerBClear" type="button" aria-label="Очистить шпон стороны Б">×</button>
+                <button class="autocomplete-clear is-hidden" id="veneerBClear" type="button" aria-label="Очистить шпон обратной стороны">×</button>
                 <div class="autocomplete-menu is-hidden" id="veneerBSuggestions" role="listbox"></div>
               </div>
               <span class="field__error" id="veneerBError"></span>
             </div>
             <label class="field is-hidden" id="veneerBCutField">
-              <span class="field__label">Тип рисунка стороны Б</span>
+              <span class="field__label">Тип рисунка обратной стороны</span>
               <select id="veneerBCutSelect"><option value="">Выберите тип рисунка</option></select>
               <span class="field__error" id="veneerBCutError"></span>
             </label>
             <label class="field is-hidden" id="veneerBRoughThicknessField">
-              <span class="field__label">Толщина чернового шпона стороны Б</span>
+              <span class="field__label">Толщина чернового шпона обратной стороны</span>
               <select id="veneerBRoughThicknessSelect"><option value="">Выберите толщину</option></select>
             </label>
           </div>
@@ -132,7 +132,7 @@
           </div>
 
           <label class="field is-hidden" id="layoutBField">
-            <span class="field__label">Раскладка / рисунок шпона — сторона Б</span>
+            <span class="field__label">Раскладка / рисунок шпона — обратная сторона</span>
             <select id="layoutBSelect"><option value="">Как на стороне А</option></select>
           </label>
 
@@ -508,6 +508,6 @@
   <script src="../../js/core/panels-core.js?v=20261028-edge-threshold"></script>
   <script src="../../js/core/specification-state.js"></script>
   <script src="../../js/specification-bridge.js"></script>
-  <script src="../../js/detailed-panels.js?v=20261106-integer-dimensions"></script>
+  <script src="../../js/detailed-panels.js?v=20261106-face-back-labels"></script>
 </body>
 </html>

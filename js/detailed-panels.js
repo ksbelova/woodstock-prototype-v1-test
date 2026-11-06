@@ -468,7 +468,7 @@
     if (paperAllowed || !faceReady) quickPaperBackResetHint = "";
     if (!paperAllowed && form.reverseSideSelect.value === "paper") {
       form.reverseSideSelect.value = "rough";
-      quickPaperBackResetHint = "Бумага возможна только с лицевым слоем 0,6 мм и основой до 10 мм";
+      quickPaperBackResetHint = "Бумага возможна только со шпоном на лицевой стороне толщиной 0,6 мм и основой до 10 мм";
     }
     const paperOption = form.reverseSideSelect.querySelector('option[value="paper"]');
     if (paperOption) {
@@ -534,7 +534,7 @@
     if (paperAllowed || !faceReady) quickWallPaperResetHint = "";
     if (!paperAllowed && form.reverseSideSelect.value === "paper") {
       quickWallPaperResetHint = thickness >= 1 - 0.001
-        ? "Бумага возможна только с лицевым слоем 0,6 мм"
+        ? "Бумага возможна только со шпоном на лицевой стороне толщиной 0,6 мм"
         : "Бумага возможна только на основе 10 мм";
     }
     if (!paperAllowed) form.reverseSideSelect.value = "rough";
@@ -547,7 +547,7 @@
     form.veneerSideBGrid.classList.toggle("is-hidden", !paperAllowed);
     form.veneerBFields.setAttribute("data-quick-hidden", "");
     form.layoutBField?.setAttribute("data-quick-hidden", "");
-    // Для 2 и 2,5 мм на сторону Б идёт шпон стороны А.
+    // Для 2 и 2,5 мм на обратную сторону идёт шпон стороны А.
     form.veneerBModeSelect.value = "same";
     selectedVeneerBGroup = null;
     selectedVeneerB = null;
@@ -1201,7 +1201,7 @@
   }
 
   // Временное решение команды до подтверждения WOODSTOCK:
-  // при лицевом шпоне 2/2,5 мм стеновой панели сторона Б = та же позиция,
+  // при лицевом шпоне 2/2,5 мм стеновой панели обратная сторона = та же позиция,
   // что сторона А, с той же ценой вместо более дешёвого компенсатора.
   function quickWallUsesFaceVeneerCompensator() {
     if (!isQuickWallPanel()) return false;
@@ -1697,7 +1697,7 @@
     const face = selectedVeneerThickness();
     if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(face)) return null;
     const two = Number(form.veneeredSidesSelect.value) === 2;
-    // Для расчёта итоговой толщины бумага на стороне Б = 0 мм.
+    // Для расчёта итоговой толщины бумага на обратной стороне = 0 мм.
     // Толщина бумаги не требуется для выбора кромки: запас учитывается отдельно.
     const back = two ? calibrationSideBThicknessMm()
       : form.reverseSideSelect.value === "rough" ? roughBackThicknessForCurrentSelection()
@@ -2571,7 +2571,7 @@
 
     form.readyShirtThicknessWarning.classList.toggle("is-hidden", !readyShirtWithoutThickness);
     form.readyShirtThicknessWarning.textContent = readyShirtWithoutThickness
-      ? "Толщина готовой рубашки не указана в справочнике. Количество фанерованных сторон и возможность выбора другого материала для стороны Б требуют уточнения."
+      ? "Толщина готовой рубашки не указана в справочнике. Количество фанерованных сторон и возможность выбора другого материала для обратной стороны требуют уточнения."
       : "";
     syncVeneerInfoMessagesVisibility();
 
@@ -2642,7 +2642,7 @@
     }
     const layoutNeeded = faceReady && needsLayoutSelection();
     form.layoutField?.classList.toggle("is-hidden", !layoutNeeded);
-    if (form.veneerBInputLabel) form.veneerBInputLabel.textContent = "Другой материал — сторона Б";
+    if (form.veneerBInputLabel) form.veneerBInputLabel.textContent = "Другой материал — обратная сторона";
     if (!layoutNeeded) {
       form.layoutTzFields.classList.add("is-hidden");
       form.mixMatchWarning.classList.add("is-hidden");
@@ -4577,7 +4577,7 @@
     if (sameFaceSelectionOnBack && backsideCategoryBRequired(selectedVeneerA) && !faceVeneerBItem &&
         validSizes.some((size) => classifySize(size).id !== "warehouse_standard")) {
       hasPartialPrice = true;
-      warnings.push("Сторона Б: цена категории B выбранной породы и толщины не найдена. Расчёт неполный; требуется подтверждение материала и цены оборота.");
+      warnings.push("Обратная сторона: цена категории B выбранной породы и толщины не найдена. Расчёт неполный; требуется подтверждение материала и цены оборота.");
     }
 
     validSizes.forEach((size) => {
@@ -4726,7 +4726,7 @@
             roughBackPricingStatus = "calculated";
             retailCost += rough;
             finalCost += rough;
-            breakdown.push({ label: "Черновая рубашка стороны Б · стандарт", value: rough, note: `${money(roughRate)}/м² для чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
+            breakdown.push({ label: "Черновая рубашка обратной стороны · стандарт", value: rough, note: `${money(roughRate)}/м² для чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
           } else {
             roughBackPricingStatus = "requires_clarification";
             warnings.push("Стандарт по запросу: для выбранной толщины чернового шпона нет подтверждённой ставки; стоимость не включена.");
@@ -4738,7 +4738,7 @@
             const paper = area * paperRate;
             retailCost += paper;
             finalCost += paper;
-            breakdown.push({ label: "Бумага стороны Б · стандарт", value: paper, note: `${money(paperRate)}/м².` });
+            breakdown.push({ label: "Бумага обратной стороны · стандарт", value: paper, note: `${money(paperRate)}/м².` });
           } else {
             warnings.push("Стандарт по запросу: ставка бумаги на обратной стороне не задана; стоимость не включена.");
             (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
@@ -4781,8 +4781,8 @@
         }
         if (classification.id === "standard_request" && sideBNeedsLayout() && ["diagonal45", "herringbone"].includes(layoutB) && !manufacturingCostFromProduction(size)) {
           const rate = num(layoutB === "herringbone" ? data.meta.herringboneWorkSurchargePerM2 : data.meta.diagonalWorkSurchargePerM2);
-          if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: `${layoutB === "herringbone" ? "Ёлочка" : "Диагональ 45°"} · сторона Б`, value: cost, note: `${money(rate)}/м².` }); }
-          else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка диагонали стороны Б."); }
+          if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: `${layoutB === "herringbone" ? "Ёлочка" : "Диагональ 45°"} · обратная сторона`, value: cost, note: `${money(rate)}/м².` }); }
+          else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка диагонали обратной стороны."); }
         }
         if (cleanCuttingRequired(size)) {
           const meters = ((size.length + size.width) * 2 / 1000) * size.quantity;
@@ -4925,18 +4925,18 @@
           roughBackCostTotal += rough;
           roughBackPricingStatus = "calculated";
           retailCost += rough; finalCost += rough;
-          breakdown.push({ label: "Черновой шпон стороны Б", value: rough, note: `${money(roughRate)}/м² для чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
+          breakdown.push({ label: "Черновой шпон обратной стороны", value: rough, note: `${money(roughRate)}/м² для чернового шпона ${String(roughThickness).replace(".", ",")} мм.` });
         } else {
           roughBackPricingStatus = "requires_clarification";
           (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
-          warnings.push(`Черновая сторона Б: для выбранной толщины ${Number.isFinite(roughThickness) ? `${String(roughThickness).replace(".", ",")} мм` : "—"} нет подтверждённой ставки; компонент оставлен на согласование.`);
-          breakdown.push({ label: "Черновой шпон стороны Б", value: 0, note: "Тариф для этой толщины не подтверждён — не включён автоматически." });
+          warnings.push(`Черновая обратная сторона: для выбранной толщины ${Number.isFinite(roughThickness) ? `${String(roughThickness).replace(".", ",")} мм` : "—"} нет подтверждённой ставки; компонент оставлен на согласование.`);
+          breakdown.push({ label: "Черновой шпон обратной стороны", value: 0, note: "Тариф для этой толщины не подтверждён — не включён автоматически." });
         }
       } else if (!hasFaceVeneerOnBack && form.reverseSideSelect.value === "paper") {
         const paperRate = num(data.meta.paperBackRatePerM2);
         if (Number.isFinite(paperRate)) {
           const paper = area * paperRate; retailCost += paper; finalCost += paper;
-          breakdown.push({ label: "Бумага стороны Б", value: paper, note: `${money(paperRate)}/м².` });
+          breakdown.push({ label: "Бумага обратной стороны", value: paper, note: `${money(paperRate)}/м².` });
         } else {
           warnings.push("Для бумаги на обратной стороне ставка не задана; стоимость не включена.");
           (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции"));
@@ -4948,8 +4948,8 @@
 
       if (sideBNeedsLayout() && ["diagonal45", "herringbone"].includes(layoutB) && !manufacturingCostFromProduction(size)) {
         const rate = num(layoutB === "herringbone" ? data.meta.herringboneWorkSurchargePerM2 : data.meta.diagonalWorkSurchargePerM2);
-        if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: `${layoutB === "herringbone" ? "Ёлочка" : "Диагональ 45°"} · сторона Б`, value: cost, note: `${money(rate)}/м².` }); }
-        else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка диагонали стороны Б."); }
+        if (Number.isFinite(rate)) { const cost = area * rate; retailCost += cost; finalCost += cost; breakdown.push({ label: `${layoutB === "herringbone" ? "Ёлочка" : "Диагональ 45°"} · обратная сторона`, value: cost, note: `${money(rate)}/м².` }); }
+        else { (hasPartialPrice = true, markPositionPending(size, "Основа и производственные операции")); warnings.push("Не подтверждена ставка диагонали обратной стороны."); }
       }
       if (cleanCuttingRequired(size)) {
         const meters = ((size.length + size.width) * 2 / 1000) * size.quantity, rate = manufacturingCostFromProduction(size) ? null : cuttingRateFor(thickness.raw, base?.id);
@@ -5334,16 +5334,16 @@
       if (sameVeneerOnB && backsideCategoryBRequired(selectedVeneerA)) {
         addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон стороны А${contextLabel}`, false, pricingMode);
         const backB = backsideBVariantFor(selectedVeneerA);
-        if (backB) addVeneerComponent(backB, requiredB, "B", `Шпон стороны Б (категория B)${contextLabel}`, false, pricingMode);
+        if (backB) addVeneerComponent(backB, requiredB, "B", `Шпон обратной стороны (категория B)${contextLabel}`, false, pricingMode);
         else {
-          warnings.push(`Сторона Б${contextLabel}: для Extra/AA нельзя автоматически дублировать лицевой шпон; цена категории B для выбранной позиции не найдена.`);
+          warnings.push(`Обратная сторона${contextLabel}: для Extra/AA нельзя автоматически дублировать лицевой шпон; цена категории B для выбранной позиции не найдена.`);
           hasPartialPrice = true;
         }
       } else if (sameVeneerOnB && layout === layoutB) {
         addVeneerComponent(selectedVeneerA, requiredA + requiredB, "A", `Шпон сторон А и Б${contextLabel}`, true, pricingMode);
       } else {
         if (requiredA > 0) addVeneerComponent(selectedVeneerA, requiredA, "A", `Шпон стороны А${contextLabel}`, false, pricingMode);
-        if (requiredB > 0 && (sameVeneerOnB ? faceVeneerBItem : selectedVeneerB)) addVeneerComponent(sameVeneerOnB ? faceVeneerBItem : selectedVeneerB, requiredB, "B", `Шпон стороны Б${contextLabel}`, false, pricingMode);
+        if (requiredB > 0 && (sameVeneerOnB ? faceVeneerBItem : selectedVeneerB)) addVeneerComponent(sameVeneerOnB ? faceVeneerBItem : selectedVeneerB, requiredB, "B", `Шпон обратной стороны${contextLabel}`, false, pricingMode);
       }
     };
 
@@ -5392,8 +5392,8 @@
         addStandardSheetGroupRow({
           item: faceVeneerBItem, which: "B", surfaceCount: 1,
           label: backsideCategoryBRequired(selectedVeneerA)
-            ? "Шпон стороны Б (категория B) · стандарт по запросу"
-            : "Шпон стороны Б · стандарт по запросу",
+            ? "Шпон обратной стороны (категория B) · стандарт по запросу"
+            : "Шпон обратной стороны · стандарт по запросу",
           row: item
         });
       }
@@ -6306,7 +6306,7 @@
       mixMatchPurchaseArea,
       diagonalValid,
       invalidDiagonalPositions: invalidDiagonalSizes.map((size) => size.position),
-      error: !backLayoutAllowed ? "Выбранная раскладка недоступна для материала стороны Б." : layoutSelectionRequired && rawLayout && !layoutAllowed
+      error: !backLayoutAllowed ? "Выбранная раскладка недоступна для материала обратной стороны." : layoutSelectionRequired && rawLayout && !layoutAllowed
         ? "Выбранная раскладка недоступна для мультишпона."
         : layoutSelectionRequired && !rawLayout
         ? "Выберите раскладку шпона."
@@ -6337,7 +6337,7 @@
     if (roughSideRequested && !isExactlyOnePointFive(veneerThickness)) {
       warnings.push("Черновой шпон на второй стороне разрешён только для лицевого шпона 1,5 мм.");
     } else if (roughSideRequested && !Number.isFinite(selectedRoughThickness)) {
-      warnings.push("Выберите подтверждённую толщину чернового шпона стороны Б до 1,5 мм включительно.");
+      warnings.push("Выберите подтверждённую толщину чернового шпона обратной стороны до 1,5 мм включительно.");
     }
 
     let weightMin = 0, weightMax = 0, hasWeight = false;
@@ -6786,22 +6786,22 @@
     if (layout?.name && needsLayoutSelection()) characteristics.push(specRow("Раскладка А", layout.name));
     if (sideBNeedsLayout()) characteristics.push(specRow("Раскладка Б", data.layouts.find(x => x.id === effectiveLayoutBId())?.name || "—"));
 
-    characteristics.push(specRow("Сторона Б", sideBMode));
+    characteristics.push(specRow("Обратная сторона", sideBMode));
     if (sides === 2) {
       if (sideBSelectionMode === "rough") {
-        characteristics.push(specRow("Материал стороны Б", "Черновой шпон", 1));
+        characteristics.push(specRow("Материал обратной стороны", "Черновой шпон", 1));
       } else if (sideBSelectedMaterial) {
         characteristics.push(specRow(
-          "Материал стороны Б",
+          "Материал обратной стороны",
           isReadyShirt(sideBSelectedMaterial) ? (sideBSelectedMaterial.displayName || "—") : veneerDisplayName(sideBSelectedMaterial),
           1
         ));
         if (!isReadyShirt(sideBSelectedMaterial) && sideBSelectedMaterial?.typeName) {
-          characteristics.push(specRow("Тип шпона стороны Б", sideBSelectedMaterial.typeName, 1));
+          characteristics.push(specRow("Тип шпона обратной стороны", sideBSelectedMaterial.typeName, 1));
         }
       }
-      if (Number.isFinite(sideBThickness)) characteristics.push(specRow("Толщина материала стороны Б", `${specNumber(sideBThickness, 2)} мм`, 1));
-      if (sideBPatternName && !isReadyShirt(sideBSelectedMaterial)) characteristics.push(specRow("Тип рисунка стороны Б", sideBPatternName, 1));
+      if (Number.isFinite(sideBThickness)) characteristics.push(specRow("Толщина материала обратной стороны", `${specNumber(sideBThickness, 2)} мм`, 1));
+      if (sideBPatternName && !isReadyShirt(sideBSelectedMaterial)) characteristics.push(specRow("Тип рисунка обратной стороны", sideBPatternName, 1));
     }
 
     if (form.layoutTzComment.value.trim()) characteristics.push(specRow("Комментарий к раскладке", form.layoutTzComment.value.trim()));
@@ -7418,18 +7418,18 @@
     if (sides === 2 && form.veneerBModeSelect.value === "other") {
       const sideBMaterial = selectedVeneerB || selectedVeneerBGroup;
       if (isReadyShirt(selectedVeneerA || selectedVeneerAGroup) && !Number.isFinite(veneerThickness)) {
-        add("veneerB", "материал стороны Б", form.veneerBInput, "Для выбора другого материала необходимо указать подтверждённую толщину готовой рубашки.", form.veneerBError);
+        add("veneerB", "материал обратной стороны", form.veneerBInput, "Для выбора другого материала необходимо указать подтверждённую толщину готовой рубашки.", form.veneerBError);
       } else if (!sideBMaterial || !sameConfirmedThickness(veneerThickness, itemThickness(sideBMaterial))) {
-        add("veneerB", "материал стороны Б той же толщины", form.veneerBInput, "Для второй стороны выберите материал той же толщины.", form.veneerBError);
+        add("veneerB", "материал обратной стороны той же толщины", form.veneerBInput, "Для второй стороны выберите материал той же толщины.", form.veneerBError);
       }
     }
 
     if (sides === 2 && form.veneerBModeSelect.value === "rough") {
       const roughThickness = selectedRoughBackThickness();
       if (!isExactlyOnePointFive(veneerThickness)) {
-        add("veneerBMode", "допустимый материал стороны Б", form.veneerBModeSelect, "Черновой шпон на второй стороне разрешён только для лицевого шпона 1,5 мм.", form.veneerBModeHint);
+        add("veneerBMode", "допустимый материал обратной стороны", form.veneerBModeSelect, "Черновой шпон на второй стороне разрешён только для лицевого шпона 1,5 мм.", form.veneerBModeHint);
       } else if (!Number.isFinite(roughThickness) || roughThickness > 1.5 + 0.001) {
-        add("veneerBRoughThickness", "толщину чернового шпона стороны Б", form.veneerBRoughThicknessSelect, "Выберите подтверждённую толщину чернового шпона стороны Б до 1,5 мм включительно.");
+        add("veneerBRoughThickness", "толщину чернового шпона обратной стороны", form.veneerBRoughThicknessSelect, "Выберите подтверждённую толщину чернового шпона обратной стороны до 1,5 мм включительно.");
       }
     }
 
@@ -8763,7 +8763,7 @@
         return;
       }
       if (!Number.isFinite(roughThickness) || roughThickness > 1.5 + 0.001) {
-        form.saveStatus.textContent = "Выберите подтверждённую толщину чернового шпона стороны Б до 1,5 мм включительно.";
+        form.saveStatus.textContent = "Выберите подтверждённую толщину чернового шпона обратной стороны до 1,5 мм включительно.";
         return;
       }
     }
