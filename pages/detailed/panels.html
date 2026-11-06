@@ -195,7 +195,7 @@
 
             <div class="field-grid field-grid--two">
               <div class="field autocomplete-field">
-                <label class="field__label" for="edgeMaterialInput">Материал кромки</label>
+                <label class="field__label" for="edgeMaterialInput">Порода</label>
                 <div class="autocomplete-control">
                   <input id="edgeMaterialInput" type="text" autocomplete="off" placeholder="Сначала выберите тип кромки" aria-controls="edgeMaterialSuggestions" aria-expanded="false" />
                   <button class="autocomplete-clear is-hidden" id="edgeMaterialClear" type="button" aria-label="Очистить наименование кромки">×</button>
@@ -206,7 +206,7 @@
               </div>
 
               <label class="field is-hidden" id="edgeThicknessField">
-                <span class="field__label">Толщина кромки, мм</span>
+                <span class="field__label">Толщина, мм</span>
                 <select id="edgeThicknessSelect">
                   <option value="">Выберите толщину кромки</option>
                 </select>
@@ -215,13 +215,13 @@
 
             <div class="field-grid field-grid--two">
               <label class="field" id="edgeWidthField">
-                <span class="field__label">Ширина кромки, мм</span>
+                <span class="field__label">Ширина, мм</span>
                 <select id="edgeWidthSelect" disabled>
                   <option value="">Выберите позицию кромки</option>
                 </select>
               </label>
               <label class="field is-hidden" id="edgeOrderWidthField">
-                <span class="field__label">Ширина кромки, мм</span>
+                <span class="field__label">Ширина, мм</span>
                 <input id="edgeOrderWidthInput" type="number" min="1" step="1" inputmode="decimal" />
                 <span class="field__note">Предложена ширина по толщине детали; можно изменить. Цена заказной кромки требует согласования.</span>
               </label>
@@ -269,7 +269,7 @@
 
             <div class="field-grid field-grid--two">
               <div class="field autocomplete-field">
-                <label class="field__label" for="separateEdgeMaterialInput">Материал кромки</label>
+                <label class="field__label" for="separateEdgeMaterialInput">Порода</label>
                 <div class="autocomplete-control">
                   <input id="separateEdgeMaterialInput" type="text" autocomplete="off" placeholder="Сначала выберите тип кромки" aria-controls="separateEdgeMaterialSuggestions" aria-expanded="false" />
                   <button class="autocomplete-clear is-hidden" id="separateEdgeMaterialClear" type="button" aria-label="Очистить наименование кромки">×</button>
@@ -280,7 +280,7 @@
               </div>
 
               <label class="field is-hidden" id="separateEdgeThicknessField">
-                <span class="field__label">Толщина кромки, мм</span>
+                <span class="field__label">Толщина, мм</span>
                 <select id="separateEdgeThicknessSelect">
                   <option value="">Выберите толщину кромки</option>
                 </select>
@@ -289,13 +289,13 @@
 
             <div class="field-grid field-grid--two">
               <label class="field" id="separateEdgeWidthField">
-                <span class="field__label">Ширина кромки, мм</span>
+                <span class="field__label">Ширина, мм</span>
                 <select id="separateEdgeWidthSelect" disabled>
                   <option value="">Выберите позицию кромки</option>
                 </select>
               </label>
               <label class="field is-hidden" id="separateEdgeOrderWidthField">
-                <span class="field__label">Ширина кромки, мм</span>
+                <span class="field__label">Ширина, мм</span>
                 <input id="separateEdgeOrderWidthInput" type="number" min="1" step="1" inputmode="decimal" />
                 <span class="field__note">Предложена ширина по толщине детали; можно изменить. Цена заказной кромки требует согласования.</span>
               </label>
@@ -510,6 +510,6 @@
   <script src="../../js/core/panels-core.js?v=20261028-edge-threshold"></script>
   <script src="../../js/core/specification-state.js"></script>
   <script src="../../js/specification-bridge.js"></script>
-  <script src="../../js/detailed-panels.js?v=20261106-pattern-layout-labels"></script>
+  <script src="../../js/detailed-panels.js?v=20261106-edge-glue-rules"></script>
 </body>
 </html>

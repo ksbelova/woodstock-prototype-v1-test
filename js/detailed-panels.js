@@ -1523,25 +1523,50 @@
     return findEdgeNameGroup(typeId, veneerDisplayName(edgeDefaultVeneer()));
   }
 
+  function isQuickManufacturedPanel() {
+    return isQuickWallPanel() || isQuickDetailsPanel();
+  }
+
+  function edgeTypeIdForThickness(preferred, thickness, which) {
+    const glue = ["sk_s", "thick_glue_1"].includes(preferred) &&
+      !(isQuickManufacturedPanel() && which === "attached");
+    if (!Number.isFinite(thickness)) return preferred;
+    if (thickness === 0.6) return glue ? "sk_s" : "vl_s";
+    if (thickness === 1) return glue ? "thick_glue_1" : "thick";
+    return "thick";
+  }
+
   function currentEdgeThickness(which = "attached") {
+    return num(edgeControls(which).thicknessSelect?.value);
+  }
+
+  function syncEdgeTypeOptions(which) {
     const controls = edgeControls(which);
-    const type = edgeTypeById(controls.typeSelect?.value);
-    if (isQuickWallPanel() && which === "attached") {
-      const value = num(controls.thicknessSelect?.value);
-      return [0.6, 1, 1.5, 2].includes(value) ? value : null;
+    const thickness = currentEdgeThickness(which);
+    const previous = controls.typeSelect.value;
+    const ids = thickness === 0.6 ? ["vl_s", "sk_s"]
+      : thickness === 1 ? ["thick", "thick_glue_1"]
+      : Number.isFinite(thickness) ? ["thick"] : ["thick", "vl_s", "sk_s"];
+    const labels = { thick: "Без клея", vl_s: "Без клея на флисе (VL/S)",
+      sk_s: "С клеем (SK/S)", thick_glue_1: "С клеем (SK/S)" };
+    controls.typeSelect.replaceChildren(new Option("Выберите тип кромки", ""));
+    ids.forEach(id => controls.typeSelect.add(new Option(labels[id], id)));
+    const selected = edgeTypeIdForThickness(previous, thickness, which);
+    controls.typeSelect.value = ids.includes(selected) ? selected : "";
+    if (previous !== controls.typeSelect.value) {
+      clearEdgeCatalogBinding(which);
+      syncEdgeDefaultForKind(which);
     }
-    if (!type || type.thicknessMode === "none") return null;
-    const value = num(controls.thicknessSelect?.value);
-    return Number.isFinite(value) ? value : null;
   }
 
   function resolveEdgeCatalogItem(which = "attached", options = {}) {
     const controls = edgeControls(which);
-    const type = edgeTypeById(controls.typeSelect?.value);
+    const selectedThickness = Object.prototype.hasOwnProperty.call(options, "thicknessMm")
+      ? num(options.thicknessMm) : currentEdgeThickness(which);
+    const type = edgeTypeById(edgeTypeIdForThickness(controls.typeSelect?.value, selectedThickness, which));
     const group = edgeNameGroupForInput(which);
-    if (!type || !group || (isDetailedPanelCalculation() && which === "attached" && type.hasGlue === true)) return null;
+    if (!type || !group) return null;
     const candidates = edgeCatalogItems(type.id).filter((item) =>
-      !(isDetailedPanelCalculation() && which === "attached" && item.hasGlue === true) &&
       normalizeEdgeLookup(item.veneerName || item.displayName) === normalizeEdgeLookup(group.displayName));
     const boundId = controls.materialInput?.dataset?.catalogItemId || "";
     const bound = boundId ? candidates.find((item) => item.id === boundId) : null;
@@ -1558,41 +1583,15 @@
 
   function syncEdgeThicknessOptions(which = "attached", { preserve = true } = {}) {
     const controls = edgeControls(which);
-    const type = edgeTypeById(controls.typeSelect?.value);
-    const previous = preserve ? currentEdgeThickness(which) : null;
-    if (isQuickWallPanel() && which === "attached") {
-      controls.thicknessSelect.replaceChildren(new Option("Выберите толщину кромки", ""));
-      [0.6, 1, 1.5, 2].forEach(value => controls.thicknessSelect.add(new Option(String(value).replace(".", ","), String(value))));
-      controls.thicknessField.classList.remove("is-hidden");
-      controls.thicknessSelect.disabled = false;
-      controls.thicknessSelect.value = [0.6, 1, 1.5, 2].includes(previous) ? String(previous) : "";
-      return;
-    }
-    controls.thicknessSelect.replaceChildren();
-    controls.thicknessSelect.add(new Option("Выберите толщину кромки", ""));
-
-    if (!type || type.thicknessMode === "none") {
-      controls.thicknessField.classList.add("is-hidden");
-      controls.thicknessSelect.disabled = true;
-      controls.thicknessSelect.value = "";
-      return;
-    }
-
+    const previous = preserve ? (currentEdgeThickness(which) ?? (["vl_s", "sk_s"].includes(controls.typeSelect.value) ? 0.6 : null)) : null;
+    const values = isQuickWallPanel() && which === "attached"
+      ? [0.6, 1, 1.5, 2] : [0.6, 1, 1.5, 2, 3, 3.5, 4];
+    controls.thicknessSelect.replaceChildren(new Option("Выберите толщину кромки", ""));
+    values.forEach(value => controls.thicknessSelect.add(new Option(String(value).replace(".", ","), String(value))));
     controls.thicknessField.classList.remove("is-hidden");
-    const values = Array.isArray(type.thicknesses) ? type.thicknesses : [];
-    values.forEach((value) => controls.thicknessSelect.add(new Option(String(value).replace(".", ","), String(value))));
-    if (type.thicknessMode === "fixed" && values.length === 1) {
-      controls.thicknessSelect.value = String(values[0]);
-      controls.thicknessSelect.disabled = true;
-      return;
-    }
-
     controls.thicknessSelect.disabled = false;
-    if (Number.isFinite(previous) && values.some((value) => Math.abs(Number(value) - previous) < 0.001)) {
-      controls.thicknessSelect.value = String(previous);
-    } else if (isDetailedPanelCalculation() && values.some(value => Number(value) === 1)) {
-      controls.thicknessSelect.value = "1";
-    }
+    controls.thicknessSelect.value = values.includes(previous) ? String(previous) : "";
+    syncEdgeTypeOptions(which);
   }
 
   function syncEdgeDefaultForKind(which = "attached") {
@@ -1746,13 +1745,13 @@
 
   function edgeSelectionState(which = "attached", options = {}) {
     const controls = edgeControls(which);
-    const type = edgeTypeById(controls.typeSelect?.value);
     const rawName = controls.materialInput.value.trim();
     const group = edgeNameGroupForInput(which);
     const hasThicknessOverride = Object.prototype.hasOwnProperty.call(options, "thicknessMm");
     const thickness = hasThicknessOverride ? num(options.thicknessMm) : currentEdgeThickness(which);
+    const type = edgeTypeById(edgeTypeIdForThickness(controls.typeSelect?.value, thickness, which));
     const item = resolveEdgeCatalogItem(which, {thicknessMm:thickness,...(Object.prototype.hasOwnProperty.call(options,"widthMm")?{widthMm:options.widthMm}:{})});
-    const thicknessRequired = Boolean(type && (type.thicknessMode !== "none" || isQuickWallPanel() && which === "attached"));
+    const thicknessRequired = Boolean(type);
     const customOrder = Boolean(type && rawName && (!group || (group && thicknessRequired && Number.isFinite(thickness) && !item)));
     const selectedStockWidth = Object.prototype.hasOwnProperty.call(options, "widthMm") ? num(options.widthMm) : num(controls.widthSelect.value);
     const requestedOrderWidth = Object.prototype.hasOwnProperty.call(options, "widthMm") ? num(options.widthMm) : num(controls.orderWidthInput.value);
@@ -1809,14 +1808,14 @@
     return {
       which,
       typeId: type?.id || "",
-      typeName: type?.name || "",
+      typeName: type ? ({ thick: "Без клея", vl_s: "Без клея на флисе (VL/S)", sk_s: "С клеем (SK/S)", thick_glue_1: "С клеем (SK/S)" }[type.id] || type.name) : "",
       name: item?.name || rawName,
       displayName: item?.displayName || rawName,
       veneerName: item?.veneerName || rawName,
       thicknessMm: Number.isFinite(thickness) ? thickness : null,
       thicknessApplicable: thicknessRequired,
       widthMm: Number.isFinite(width) ? width : null,
-      hasGlue: (isQuickWallPanel() || isDetailedPanelCalculation()) && which === "attached" ? false : item?.hasGlue ?? type?.hasGlue ?? null,
+      hasGlue: ["sk_s", "thick_glue_1"].includes(type?.id),
       hasFleece: item?.hasFleece ?? type?.hasFleece ?? null,
       catalogItem: item,
       catalogItemId: item?.id || null,
@@ -1915,7 +1914,10 @@
     clearEdgeCatalogBinding(which);
     controls.orderWidthInput.value = "";
     if (controls.orderPriceInput) controls.orderPriceInput.value = "";
-    syncEdgeThicknessOptions(which, { preserve: false });
+    if (!Number.isFinite(currentEdgeThickness(which))) {
+      controls.thicknessSelect.value = ["vl_s", "sk_s"].includes(controls.typeSelect.value) ? "0.6" : "1";
+    }
+    syncEdgeThicknessOptions(which, { preserve: true });
     syncEdgeDefaultForKind(which);
     syncEdgeWidthOptions(which, { preserve: false });
     recalc();
@@ -3918,14 +3920,14 @@
   }
 
   function availableAttachedEdgeSides() {
-    if (!isQuickWallPanel()) return data?.edgeSides || [];
+    if (!isQuickManufacturedPanel()) return data?.edgeSides || [];
     const labels = { perimeter: "По периметру", two_lengths: "По длинным сторонам", two_widths: "По коротким сторонам" };
     return (data?.edgeSides || []).filter(item => Object.prototype.hasOwnProperty.call(labels, item.id))
       .map(item => ({ ...item, name: labels[item.id] }));
   }
 
   function edgeRuleById(id) {
-    return (isQuickWallPanel() ? availableAttachedEdgeSides() : data?.edgeSides || []).find((item) => item.id === id) || null;
+    return (isQuickManufacturedPanel() ? availableAttachedEdgeSides() : data?.edgeSides || []).find((item) => item.id === id) || null;
   }
 
   function edgeMetersForSize(size, sidesId = form.edgeSidesSelect.value) {
@@ -3980,16 +3982,9 @@
     const mode = ["inherit", "custom", "none"].includes(state.mode) ? state.mode : "inherit";
     const validSideIds = new Set((data?.edgeSides || []).map((item) => item.id));
     const sidesId = validSideIds.has(state.sidesId) ? state.sidesId : (form.edgeSidesSelect.value || "");
-    const type = edgeTypeById(form.edgeTypeSelect.value);
-    let thicknessMm = num(state.thicknessMm);
-    if (!type || type.thicknessMode === "none") thicknessMm = null;
-    else {
-      const allowed = Array.isArray(type.thicknesses) ? type.thicknesses.map(Number).filter(Number.isFinite) : [];
-      if (!Number.isFinite(thicknessMm) || !allowed.some((value) => Math.abs(value - thicknessMm) < 0.001)) {
-        const common = currentEdgeThickness("attached");
-        thicknessMm = Number.isFinite(common) && allowed.some((value) => Math.abs(value - common) < 0.001) ? common : (allowed.length === 1 ? allowed[0] : null);
-      }
-    }
+    const allowed = Array.from(form.edgeThicknessSelect.options).map(option => Number(option.value)).filter(value => value > 0);
+    const value = num(state.thicknessMm);
+    const thicknessMm = allowed.includes(value) ? value : currentEdgeThickness("attached");
     return { mode, sidesId, thicknessMm, widthMm: num(state.widthMm) };
   }
 
@@ -4028,9 +4023,8 @@
   }
 
   function positionEdgeThicknessOptionsHtml(selectedValue) {
-    const type = edgeTypeById(form.edgeTypeSelect.value);
-    if (!type || type.thicknessMode === "none") return "";
-    return [`<option value="">Выберите толщину кромки</option>`, ...(type.thicknesses || []).map((value) => `<option value="${esc(value)}"${Number(selectedValue) === Number(value) ? " selected" : ""}>${esc(String(value).replace(".", ","))}</option>`)].join("");
+    const values = Array.from(form.edgeThicknessSelect.options).map(option => Number(option.value)).filter(value => value > 0);
+    return [`<option value="">Выберите толщину кромки</option>`, ...values.map(value => `<option value="${esc(value)}"${Number(selectedValue) === value ? " selected" : ""}>${esc(String(value).replace(".", ","))}</option>`)].join("");
   }
 
   function positionEdgeWidthControl(state) {
@@ -4059,7 +4053,7 @@
       return `<div class="finish-position-card" data-position-edge-row="${esc(rowId)}">
         <div class="finish-position-card__head"><strong data-position-edge-title>${esc(positionEdgeLabel(row, index))}</strong><div class="field__note" data-position-edge-summary>${esc(positionEdgeSummary(state))}</div></div>
         <label class="field"><span class="field__label">Настройка кромления</span><select data-position-edge-mode><option value="inherit"${state.mode === "inherit" ? " selected" : ""}>Общие настройки</option><option value="custom"${custom ? " selected" : ""}>Индивидуальные настройки</option><option value="none"${state.mode === "none" ? " selected" : ""}>Без кромления</option></select></label>
-        ${custom ? `<div class="finish-position-details"><label class="field"><span class="field__label">Стороны кромления</span><select data-position-edge-sides>${sideOptions}</select><span class="field__error" data-position-edge-sides-error></span></label>${type && type.thicknessMode !== "none" ? `<label class="field"><span class="field__label">Толщина кромки, мм</span><select data-position-edge-thickness>${positionEdgeThicknessOptionsHtml(state.thicknessMm)}</select><span class="field__error" data-position-edge-thickness-error></span></label>` : ""}<label class="field"><span class="field__label">Ширина кромки, мм</span>${positionEdgeWidthControl(state)}</label></div>` : ""}
+        ${custom ? `<div class="finish-position-details"><label class="field"><span class="field__label">Стороны кромления</span><select data-position-edge-sides>${sideOptions}</select><span class="field__error" data-position-edge-sides-error></span></label>${type ? `<label class="field"><span class="field__label">Толщина, мм</span><select data-position-edge-thickness>${positionEdgeThicknessOptionsHtml(state.thicknessMm)}</select><span class="field__error" data-position-edge-thickness-error></span></label>` : ""}<label class="field"><span class="field__label">Ширина, мм</span>${positionEdgeWidthControl(state)}</label></div>` : ""}
       </div>`;
     }).join("");
   }
@@ -7548,7 +7542,7 @@
         add(`${which}EdgeMaterial`, "наименование кромки", controls.materialInput, "Выберите или укажите шпон / наименование кромки.", controls.materialError);
       }
       const type = edgeTypeById(controls.typeSelect.value);
-      if (type && type.thicknessMode !== "none" && !Number.isFinite(currentEdgeThickness(which))) {
+      if (type && !Number.isFinite(currentEdgeThickness(which))) {
         add(`${which}EdgeThickness`, "толщину кромки", controls.thicknessSelect, "Выберите толщину кромки.");
       }
       if (selection && !Number.isFinite(selection.widthMm)) {
@@ -7853,12 +7847,12 @@
   }
 
   function syncQuickWallEdge() {
-    if (!isQuickWallPanel()) return;
+    if (!isQuickManufacturedPanel()) return;
     // Existing KM1 certificate handling remains authoritative for GSP.
     if (selectedBase()?.id === "gsp") return;
     form.edgeModeSelect.value = "attached";
     form.edgeBevelSelect.value = "no";
-    edgeWidthAutomatic.attached = true;
+    if (isQuickWallPanel()) edgeWidthAutomatic.attached = true;
     const typeId = Math.abs(num(form.edgeThicknessSelect.value) - 0.6) < 0.001 ? "vl_s" : "thick";
     if (form.edgeTypeSelect.value !== typeId) {
       form.edgeTypeSelect.value = typeId;
@@ -7888,6 +7882,8 @@
     syncQuickPaperBack();
     syncDetailedPaperBack();
     syncQuickWallEdge();
+    syncEdgeTypeOptions("attached");
+    syncEdgeTypeOptions("separate");
     if (isQuickStandardPanel()) edgeWidthAutomatic.separate = true;
     syncEdgeWidthOptions("attached", { preserve: true });
     syncEdgeWidthOptions("separate", { preserve: true });
@@ -7896,7 +7892,7 @@
     updateThicknessWarnings();
     const edgeModeChangedByAvailability = updateAttachedEdgeAvailability();
     syncPositionEdgeStateWithRows();
-    if (edgeModeChangedByAvailability || isQuickWallPanel()) syncEdgeModeFields();
+    if (edgeModeChangedByAvailability || isQuickManufacturedPanel()) syncEdgeModeFields();
     if (form.edgeModeSelect.value === "attached" && positionEdgeOverridesEnabled) renderPositionEdgeOverrides();
     syncDetailedBevelAvailability();
     syncVeneerActualOverridesWithDemand();
@@ -8302,10 +8298,8 @@
     availableAttachedEdgeSides().forEach((x) => form.edgeSidesSelect.add(new Option(x.name, x.id)));
     data.edgeSides.forEach((x) => form.separateEdgeSidesSelect.add(new Option(x.name, x.id)));
     form.separateEdgeSidesSelect.value = "perimeter";
-    (data.edgeTypes || []).forEach((x) => {
-      if (!isDetailedPanelCalculation() || x.hasGlue !== true) form.edgeTypeSelect.add(new Option(x.name, x.id));
-      form.separateEdgeTypeSelect.add(new Option(x.name, x.id));
-    });
+    syncEdgeTypeOptions("attached");
+    syncEdgeTypeOptions("separate");
     syncEdgeThicknessOptions("attached", { preserve: false });
     syncEdgeThicknessOptions("separate", { preserve: false });
     syncEdgeWidthOptions("attached", { preserve: false });
@@ -9589,6 +9583,11 @@
       bindFileInput(input,output,true);
       input.addEventListener('change',()=>{updateSizeTransitionUI(row);recalc();});
     });
+    ["attached", "separate"].forEach(which => syncEdgeThicknessOptions(which, { preserve: true }));
+    if (isQuickManufacturedPanel()) {
+      [form.edgeModeSelect, form.edgeTypeSelect, form.edgeBevelSelect].forEach(input =>
+        input.closest(".field")?.setAttribute("data-quick-hidden", ""));
+    }
     if(positionFinishOverridesEnabled)renderPositionFinishOverrides(false);
     if(positionEdgeOverridesEnabled)renderPositionEdgeOverrides(false);
     recalc();
