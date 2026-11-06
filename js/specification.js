@@ -28,6 +28,7 @@
   }
   function services(){return [...(order.packagingSelect?['Упаковка: '+order.packagingSelect]:[]),...Object.entries(serviceNames).filter(([id])=>order[id]).map(([,label])=>label)];}
   function known(record){
+    if(record.pricingUnavailable || editorController && records[editorIndex]?.id === record.id && editorController.result?.()?.pricingUnavailable)return null;
     // A partial record with no calculated monetary amount is unknown, not a zero-ruble offer.
     if(inProduction(record)){
       const materialCost=materialKnown(record);
@@ -141,6 +142,7 @@
     ['Производство для клиента с НДС',money(state.clientCost)],['Статус',state.valid?'Подтверждено':'Требуется подтверждение стоимости производства']]:[];}
 
   function totals(){
+    if(records.some(record=>record.pricingUnavailable) || editorController?.result?.()?.pricingUnavailable)return {total:null,vat:null,partial:true};
     const values=records.map(known).filter(Number.isFinite);
     const quote=quoteState();
     // Sum only already rounded order lines in integer kopecks.
@@ -165,7 +167,7 @@
     const edge=effectiveEdge(record)||{},attached=edge.mode==='attached'?edge.positionSettings?.find(item=>item.position===row.position):null;
     const tech=record.technologicalOperations||{};
     const finish=record.finishByPosition?.find(item=>item.position===row.position)?.summary||record.finish||'—';
-    const price=value=>inProduction(record)?'Производство общей суммой; материалы — в итоге изделия':money(value)+(row.pricingPartial&&Number.isFinite(value)?' *':'');
+    const price=value=>record.pricingUnavailable?'Уточняется':inProduction(record)?'Производство общей суммой; материалы — в итоге изделия':money(value)+(row.pricingPartial&&Number.isFinite(value)?' *':'');
     const weightText=record.specification?.sizes?.[row.position-1]?.find(([key])=>key==='Расчётный вес основы, кг')?.[1]||'—';
     const volume=record.specification?.sizes?.[row.position-1]?.find(([key])=>key==='Объём, м³')?.[1];
     return [label,join([record.base,'Основа: '+record.baseThickness+' мм',record.calibration?.enabled?'После калибровки: '+n(record.calibration.baseThicknessAfterCalibrationMm)+' мм':'']),
@@ -434,7 +436,8 @@
       set(4,widget(row?.querySelector('.standard-size-list'))+sizeFields(row,'[data-size-manufacturing]')+sizeFields(row,'[data-size-manufacturing-type]')+widget(row?.querySelector('[data-size-fields]')));
       set(5,sourceFields(['edgeModeSelect','calibrationSelect','calibrationTargetInput','finishSelect','lacquerExecutionSelect','lacquerGlossSelect','lacquerProcessSelect','enamelVariantSelect','finishSidesSelect','toningSelect','isolatorSelect'])+widget(doc.getElementById('positionFinishToggle'))+widget(doc.querySelector('[data-position-finish-row="'+row?.dataset.rowId+'"]'))+sizeFields(row,'[data-size-transition]'));
       const result=editorController.result(),item=result?.itemResults?.[rowIndex];
-      if(item){cells[6].textContent=join([n(item.area)+' м²',item.weight?'Вес основы: '+n(item.weight.min)+(item.weight.min!==item.weight.max?'–'+n(item.weight.max):'')+' кг':'Вес основы: —']);cells[7].textContent=join([money(item.positionKnownPricePerPiece??item.positionPricePerPiece)+' / шт.',money(item.positionKnownPricePerM2??item.positionPricePerM2)+' / м²']);cells[8].textContent=money(item.positionKnownTotal??item.positionTotal);}
+      if(result?.pricingUnavailable){cells[7].textContent='Уточняется';cells[8].textContent='Уточняется';}
+      if(item && !result?.pricingUnavailable){cells[6].textContent=join([n(item.area)+' м²',item.weight?'Вес основы: '+n(item.weight.min)+(item.weight.min!==item.weight.max?'–'+n(item.weight.max):'')+' кг':'Вес основы: —']);cells[7].textContent=join([money(item.positionKnownPricePerPiece??item.positionPricePerPiece)+' / шт.',money(item.positionKnownPricePerM2??item.positionPricePerM2)+' / м²']);cells[8].textContent=money(item.positionKnownTotal??item.positionTotal);}
       set(7,sourceFields(['clientConditionSelect'])+widget(doc.getElementById('priceAdjustmentsList'))+'<p>'+esc(cells[7].textContent)+'</p>');
       set(9,sizeFields(row,'[data-size-comment]')+sizeFields(row,'[data-size-files]')+fileOutput(row?.querySelector('[data-size-files]'),row?.querySelector('[data-size-file-names]'))+sourceFields(['commentInput','filesInput'])+fileOutput(doc.getElementById('filesInput'),doc.getElementById('selectedFiles')));
     }

@@ -382,20 +382,29 @@
   }
   function selectedFinish() { return data?.finishOptions.find((x) => x.id === form.finishSelect.value) || null; }
 
-  const ALLOWED_FINISH_IDS = ["none", "lacquer_acrylic", "lacquer_polyurethane", "enamel"];
+  const ALLOWED_FINISH_IDS = ["none", "lacquer_acrylic", "lacquer_polyurethane", "lacquer_polyester", "enamel"];
   const STANDARD_LACQUER_EXECUTION = "standard";
   const GLOSS_100_EXECUTION = "gloss100";
 
+  function finishDescription(id) {
+    return {
+      lacquer_acrylic: "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.",
+      lacquer_polyurethane: "Лак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.",
+      enamel: "Эмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру.",
+      lacquer_polyester: "Полиэфирный лак. Толстое полированное покрытие с зеркальным блеском, как у рояля."
+    }[id] || "";
+  }
+
   function allowedFinishOptions() {
-    return (data?.finishOptions || []).filter((item) => ALLOWED_FINISH_IDS.includes(item.id));
+    return [...(data?.finishOptions || []).filter((item) => ALLOWED_FINISH_IDS.includes(item.id)), { id: "lacquer_polyester", name: "Полиэфирный лак" }];
   }
 
   function finishOption(id) {
-    return (data?.finishOptions || []).find((item) => item.id === id) || null;
+    return allowedFinishOptions().find((item) => item.id === id) || null;
   }
 
   function isLacquerFinish(id) {
-    return ["lacquer_acrylic", "lacquer_polyurethane"].includes(id);
+    return ["lacquer_acrylic", "lacquer_polyurethane", "lacquer_polyester"].includes(id);
   }
 
   function isAcrylicLacquer(id) {
@@ -430,6 +439,7 @@
   }
 
   function lacquerGlossOptions(id) {
+    if (id === "lacquer_polyester") return ["100%"];
     const technicalTypeId = lacquerTypeIdForFinish(id);
     return data?.finishParameters?.lacquerTypes?.find((item) => item.id === technicalTypeId)?.gloss || [];
   }
@@ -613,7 +623,7 @@
     const enamel = finishId === "enamel";
     const sides = finishUsesSides(finishId) ? (isQuickWallPanel() ? "1 сторона" : source.sides || defaultFinishSides()) : "";
 
-    let lacquerExecution = lacquer ? (source.lacquerExecution || STANDARD_LACQUER_EXECUTION) : "";
+    let lacquerExecution = lacquer ? (finishId === "lacquer_polyester" ? GLOSS_100_EXECUTION : STANDARD_LACQUER_EXECUTION) : "";
     if (lacquer && !lacquerExecutionExists(lacquerExecution)) lacquerExecution = STANDARD_LACQUER_EXECUTION;
     const gloss100 = lacquer && lacquerExecution === GLOSS_100_EXECUTION;
 
@@ -634,7 +644,7 @@
       finishId,
       toning: lacquer && source.toning === "yes" ? "yes" : "no",
       lacquerExecution,
-      lacquerGloss,
+      lacquerGloss: finishId === "lacquer_polyester" ? "100%" : lacquerGloss,
       lacquerProcess,
       enamelVariant,
       sides,
@@ -732,7 +742,7 @@
         ...(normalized.source ? { source: normalized.source } : {}),
         ...(typeof normalized.sidesManual === "boolean" ? { sidesManual: normalized.sidesManual } : {}),
         lacquerExecution: GLOSS_100_EXECUTION,
-        lacquerGloss: "",
+        lacquerGloss: normalized.finishId === "lacquer_polyester" ? "100%" : "",
         lacquerProcess: "",
         enamelVariant: "",
         sides: normalized.sides || "",
@@ -6256,7 +6266,9 @@
         const key = [normalizedConfig.finishId, normalizedConfig.lacquerExecution, normalizedConfig.lacquerProcess, normalizedConfig.enamelVariant, normalizedConfig.sides].join("|");
         if (!finishWarningKeys.has(key)) {
           finishWarningKeys.add(key);
-          if (isGloss100Finish(normalizedConfig)) {
+          if (normalizedConfig.finishId === "lacquer_polyester") {
+            warnings.push("Полиэфирный лак: требуется найти производство и согласовать возможность изготовления. Стоимость заказа пока не рассчитывается.");
+          } else if (isGloss100Finish(normalizedConfig)) {
             warnings.push("Глянец 100%: подтверждённый стабильный автоматический тариф отсутствует; стоимость лакового исполнения требуется определить производством.");
           } else if (isPolyurethaneLacquer(normalizedConfig.finishId)) {
             warnings.push("Лак полиуретановый: подтверждённый фиксированный тариф отсутствует; стоимость покрытия требуется определить производством. Акриловые тарифы не применяются.");
@@ -6664,7 +6676,9 @@
         retailAvgM2 = mdfPricings.reduce((sum, row) => sum + row.standard.pricesPerM2.retail * row.size.area, 0) / totalArea;
       }
     }
-    return { base, thickness, sizes, validSizes, itemResults, productionCosts, totalArea, totalProductionArea, totalPieces, retailTotal, retailAvgM2, automaticFinalTotal, finalTotal, manualDiscountPercent, manualDiscountCandidateTotal, manualDiscountApplied, vat, avgM2: totalArea > 0 ? finalTotal / totalArea : null, avgPiece: totalPieces > 0 ? finalTotal / totalPieces : null, totalWeight, warnings: [...new Set(warnings)], breakdown, hasPartialPrice, priceCalculationComplete, allStandard, attachedEdgeMeters, edge, edgeComment, orderLevelUnallocatedCost, positionPricingReconciled, mdfVolumeId, herringbone, customLayout, veneerPricings, readyShirtPricings, mdfPricings, baseRatePricings, veneerWasteAdjustments, veneerConsumptions, standardFinalSubtotal, standardRequestFinalSubtotal, nonstandardFinalSubtotal, roughBackVeneer, techOperations, finishResults, requiresBaseProductionCost, requiresLayoutProductionCost, requiresAllowanceProductionCost, requiresReadyShirtProductionCost, requiresFinishProductionCost, requiresOperationProductionCost, requiresProductionCost, thickVeneerWorkAdjustment, mixMatchVeneerPricing, layoutValidation, sizeValidation };
+    const pricingUnavailable = finishResults.some(item=>item.config?.finishId === "lacquer_polyester");
+    if (pricingUnavailable) priceCalculationComplete = false;
+    return { pricingUnavailable, base, thickness, sizes, validSizes, itemResults, productionCosts, totalArea, totalProductionArea, totalPieces, retailTotal, retailAvgM2, automaticFinalTotal, finalTotal, manualDiscountPercent, manualDiscountCandidateTotal, manualDiscountApplied, vat, avgM2: totalArea > 0 ? finalTotal / totalArea : null, avgPiece: totalPieces > 0 ? finalTotal / totalPieces : null, totalWeight, warnings: [...new Set(warnings)], breakdown, hasPartialPrice, priceCalculationComplete, allStandard, attachedEdgeMeters, edge, edgeComment, orderLevelUnallocatedCost, positionPricingReconciled, mdfVolumeId, herringbone, customLayout, veneerPricings, readyShirtPricings, mdfPricings, baseRatePricings, veneerWasteAdjustments, veneerConsumptions, standardFinalSubtotal, standardRequestFinalSubtotal, nonstandardFinalSubtotal, roughBackVeneer, techOperations, finishResults, requiresBaseProductionCost, requiresLayoutProductionCost, requiresAllowanceProductionCost, requiresReadyShirtProductionCost, requiresFinishProductionCost, requiresOperationProductionCost, requiresProductionCost, thickVeneerWorkAdjustment, mixMatchVeneerPricing, layoutValidation, sizeValidation };
   }
 
   function specRow(label, value, level = 0) {
@@ -8079,12 +8093,27 @@
       form.finalPriceValue.textContent = "—";
       form.finalPriceNote.textContent = calculationBlockingMessage(lastCalculation);
     }
+    if (isDetailedPanelCalculation() && el("finishDefinition")) {
+      const note=el("finishDefinition"); note.textContent=finishDescription(form.finishSelect.value); note.classList.toggle("is-hidden", !note.textContent);
+    }
+    if (lastCalculation.pricingUnavailable) {
+      [form.retailPriceValue,form.finalPriceValue,form.specPricePerM2,form.specPricePerPiece,form.specTotal].forEach(node=>{if(node)node.textContent="Уточняется";});
+      form.specVat.textContent="В том числе НДС: —";
+      form.finalPriceNote.textContent="Полиэфирный лак: сначала требуется найти производство и согласовать возможность изготовления. Стоимость заказа пока не рассчитывается.";
+      if(form.specPartialNote)form.specPartialNote.textContent=form.finalPriceNote.textContent;
+    }
     updateVeneerLayoutWarnings(lastCalculation);
     if (window.WoodstockPanelsView?.changed) window.WoodstockPanelsView.changed(lastCalculation);
   }
 
   function updateFinishUI() {
     const finishId = form.finishSelect.value || "none";
+    if (isDetailedPanelCalculation()) {
+      const label = form.finishSelect.closest(".field")?.querySelector(".field__label");
+      if (label) label.textContent = "Тип покрытия";
+      const note = el("finishDefinition");
+      if (note) { note.textContent = finishDescription(finishId); note.classList.toggle("is-hidden", !note.textContent); }
+    }
     const active = finishUsesSides(finishId);
     const lacquer = isLacquerFinish(finishId);
     const enamel = finishId === "enamel";
@@ -8114,8 +8143,8 @@
     form.enamelParameterFields.classList.toggle("is-hidden", !enamel);
     form.finishCommonFields.classList.toggle("is-hidden", !active);
     form.lacquerExtraFields?.classList.toggle("is-hidden", !lacquer);
-    form.lacquerExecutionField?.classList.toggle("is-hidden", !lacquer);
-    form.lacquerGlossField?.classList.toggle("is-hidden", !lacquer || gloss100);
+    form.lacquerExecutionField?.classList.add("is-hidden");
+    form.lacquerGlossField?.classList.toggle("is-hidden", !lacquer || gloss100 && finishId !== "lacquer_polyester");
     form.lacquerProcessField?.classList.toggle("is-hidden", !acrylic);
 
     updateLacquerGlossOptions();
@@ -8126,7 +8155,7 @@
 
   function updateLacquerExecutionOptions() {
     if (!form.lacquerExecutionSelect) return;
-    const current = form.lacquerExecutionSelect.value || STANDARD_LACQUER_EXECUTION;
+    const current = form.finishSelect.value === "lacquer_polyester" ? GLOSS_100_EXECUTION : STANDARD_LACQUER_EXECUTION;
     form.lacquerExecutionSelect.innerHTML = "";
     lacquerExecutionOptions().forEach((item) => form.lacquerExecutionSelect.add(new Option(item.name, item.id)));
     form.lacquerExecutionSelect.value = lacquerExecutionExists(current) ? current : STANDARD_LACQUER_EXECUTION;
@@ -8136,12 +8165,14 @@
     if (!form.lacquerGlossSelect) return;
     const finishId = form.finishSelect.value || "none";
     const gloss100 = isLacquerFinish(finishId) && form.lacquerExecutionSelect?.value === GLOSS_100_EXECUTION;
-    const options = gloss100 ? [] : lacquerGlossOptions(finishId);
+    const options = finishId === "lacquer_polyester" ? ["100%"] : gloss100 ? [] : lacquerGlossOptions(finishId);
     const current = form.lacquerGlossSelect.value;
     form.lacquerGlossSelect.innerHTML = "";
-    if (options.length) form.lacquerGlossSelect.add(new Option("Выберите степень блеска", ""));
+    if (options.length && finishId !== "lacquer_polyester") form.lacquerGlossSelect.add(new Option("Выберите степень блеска", ""));
     options.forEach((value) => form.lacquerGlossSelect.add(new Option(value, value)));
-    if (options.includes(current)) form.lacquerGlossSelect.value = current;
+    form.lacquerGlossSelect.disabled = finishId === "lacquer_polyester";
+    if (finishId === "lacquer_polyester") form.lacquerGlossSelect.value = "100%";
+    else if (options.includes(current)) form.lacquerGlossSelect.value = current;
     else form.lacquerGlossSelect.value = "";
   }
 
@@ -8282,11 +8313,12 @@
           <div class="field__note" data-position-finish-summary>${esc(positionFinishSummary(state))}</div>
         </div>
         <label class="field">
-          <span class="field__label">Финишное покрытие</span>
-          <select data-position-finish-select>${positionFinishOptionsHtml(finishId)}</select>
+          <span class="field__label">Тип покрытия</span>
+          <select data-position-finish-select>${positionFinishOptionsHtml(finishId)}</select><span class="field__note">${esc(finishDescription(finishId))}</span>
         </label>
         ${active ? `<label class="field"><span class="field__label">Стороны финишного покрытия</span><select data-position-finish-sides>${selectOptionsHtml(data.finishParameters.coatingSides, state.sides, item => item, finishSidesLabel)}</select></label>` : ""}
-        ${lacquer ? `<label class="field"><span class="field__label">Лаковое исполнение</span><select data-position-lacquer-execution>${selectOptionsHtml(lacquerExecutionOptions(), state.lacquerExecution, (item) => item.id, (item) => item.name)}</select></label>
+        ${lacquer ? `<label class="field is-hidden"><select data-position-lacquer-execution>${selectOptionsHtml(lacquerExecutionOptions(), state.lacquerExecution, (item) => item.id, (item) => item.name)}</select></label>
+        ${finishId === "lacquer_polyester" ? `<label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss disabled><option value="100%">100%</option></select></label>` : ""}
         ${!gloss100 ? `<div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss>${glossHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-gloss-error></span></label>
           ${acrylic ? `<label class="field"><span class="field__label">Технологическая схема лака</span><select data-position-lacquer-process>${processHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-process-error></span></label>` : ""}
@@ -8958,6 +8990,7 @@
       basePrice: (lastCalculation.requiresBaseProductionCost || lastCalculation.requiresAllowanceProductionCost)
         ? { source: "production", sourceLabel: "Определяется производством на общей странице спецификации", cost: null }
         : { source: "automatic", sourceLabel: "Автоматический расчёт", cost: null },
+      pricingUnavailable: Boolean(lastCalculation.pricingUnavailable),
       requiresProductionCost: Boolean(lastCalculation.requiresProductionCost),
       requiresBaseProductionCost: Boolean(lastCalculation.requiresBaseProductionCost),
       requiresLayoutProductionCost: Boolean(lastCalculation.requiresLayoutProductionCost),
