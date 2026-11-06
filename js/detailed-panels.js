@@ -1151,6 +1151,7 @@
     const descriptions = [
       [form.calibrationSelect, "calibrationDefinition", "Калибровка основы. Шлифовка основы до точной толщины, чтобы готовая деталь со шпоном получилась нужного размера."],
       [form.finishSelect, "finishDefinition", "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.\nЛак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.\nЭмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру."],
+      [form.isolatorSelect, "isolatorDefinition", "Изолятор. Защитный слой под лаком. Нужен для пород с маслом или смолой в древесине: без него они проступают сквозь лак пятнами."],
       [form.toningSelect, "toningDefinition", "Тонировка меняет оттенок шпона под нужный цвет и сохраняет его рисунок. Подбираем по образцу, цвет согласуем с вами до запуска производства."]
     ];
     descriptions.forEach(([control, id, text]) => {
@@ -8325,7 +8326,7 @@
         </div>` : ""}
         <div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Тонировка</span><select data-position-toning><option value="no"${state.toning !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.toning === "yes" ? " selected" : ""}>Да</option></select></label>
-          <label class="field"><span class="field__label">Изолятор</span><select data-position-isolator><option value="no"${state.isolator !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.isolator === "yes" ? " selected" : ""}>Да</option></select></label>
+          <label class="field"><span class="field__label">Изолятор</span><select data-position-isolator><option value="no"${state.isolator !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.isolator === "yes" ? " selected" : ""}>Да</option></select><span class="field__note">Изолятор. Защитный слой под лаком. Нужен для пород с маслом или смолой в древесине: без него они проступают сквозь лак пятнами.</span></label>
         </div>` : ""}
         ${enamel ? `<label class="field"><span class="field__label">Технологическая схема эмали</span><select data-position-enamel-variant>${enamelHtml}</select><span class="field__error is-hidden" data-validation-error data-position-enamel-error></span></label>` : ""}
       </div>`;
