@@ -9407,7 +9407,7 @@
       const meters = num(form.separateEdgeMetersInput.value);
       const minMeters = separateEdgeMinimumMeters();
       setSeparateEdgeMetersWarning(Number.isFinite(meters) && meters > 0 && Number.isFinite(minMeters) && meters < minMeters
-        ? `Менее ${minMeters} пог. м: минимум пока не подтверждён на уровне одной позиции. Проверьте общий метраж заявки.`
+        ? `Минимальный заказ кромки — ${minMeters} пог. м.`
         : "");
       recalc();
     });
