@@ -1668,6 +1668,7 @@
 
   function syncEdgeWidthOptions(which = "attached", { preserve = true } = {}) {
     const controls = edgeControls(which);
+    controls.orderWidthInput.readOnly = isQuickDetailsPanel() && which === "attached";
     const type = edgeTypeById(controls.typeSelect?.value);
     const rawName = controls.materialInput.value.trim();
     const group = edgeNameGroupForInput(which);
@@ -1719,7 +1720,7 @@
     controls.widthSelect.add(new Option("Выберите ширину кромки", ""));
     const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
     widths.forEach((width) => controls.widthSelect.add(new Option(`${width} мм`, String(width))));
-    controls.widthSelect.disabled = false;
+    controls.widthSelect.disabled = isQuickDetailsPanel() && which === "attached";
     if (!edgeWidthAutomatic[which] && Number.isFinite(previous) && widths.includes(previous)) {
       controls.widthSelect.value = String(previous);
     } else if (widths.length) {
@@ -1738,7 +1739,7 @@
   }
 
   function quickPanelFinishedThicknessMm() {
-    if (!isQuickWallPanel() && !isQuickStandardPanel()) return null;
+    if (!isQuickManufacturedPanel() && !isQuickStandardPanel()) return null;
     const base = parseThicknessComposition(currentBaseThicknessRaw()).total;
     const face = selectedVeneerThickness();
     if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(face)) return null;
@@ -7899,7 +7900,7 @@
     if (selectedBase()?.id === "gsp") return;
     form.edgeModeSelect.value = "attached";
     form.edgeBevelSelect.value = "no";
-    if (isQuickWallPanel()) edgeWidthAutomatic.attached = true;
+    edgeWidthAutomatic.attached = true;
     const typeId = Math.abs(num(form.edgeThicknessSelect.value) - 0.6) < 0.001 ? "vl_s" : "thick";
     if (form.edgeTypeSelect.value !== typeId) {
       form.edgeTypeSelect.value = typeId;
@@ -8163,6 +8164,11 @@
     return `${finishSummary(normalized)} · Индивидуальные настройки`;
   }
 
+  function finishSidesLabel(value) {
+    return value === "1 сторона" ? "Лицевая сторона"
+      : value === "2 стороны" ? "Лицевая и обратная сторона" : value;
+  }
+
   function selectOptionsHtml(items, selectedValue, valueGetter = (item) => item, labelGetter = (item) => item) {
     return (items || []).map((item) => {
       const value = String(valueGetter(item) ?? "");
@@ -8210,7 +8216,7 @@
           <span class="field__label">Финишное покрытие</span>
           <select data-position-finish-select>${positionFinishOptionsHtml(finishId)}</select>
         </label>
-        ${active ? `<label class="field"><span class="field__label">Стороны финишного покрытия</span><select data-position-finish-sides>${selectOptionsHtml(data.finishParameters.coatingSides, state.sides)}</select></label>` : ""}
+        ${active ? `<label class="field"><span class="field__label">Стороны финишного покрытия</span><select data-position-finish-sides>${selectOptionsHtml(data.finishParameters.coatingSides, state.sides, item => item, finishSidesLabel)}</select></label>` : ""}
         ${lacquer ? `<label class="field"><span class="field__label">Лаковое исполнение</span><select data-position-lacquer-execution>${selectOptionsHtml(lacquerExecutionOptions(), state.lacquerExecution, (item) => item.id, (item) => item.name)}</select></label>
         ${!gloss100 ? `<div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss>${glossHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-gloss-error></span></label>
@@ -8355,7 +8361,7 @@
     allowedFinishOptions().forEach((x) => form.finishSelect.add(new Option(x.name, x.id)));
     (data.finishParameters.lacquerProcesses || []).forEach((x) => form.lacquerProcessSelect?.add(new Option(x.name, x.id)));
     data.finishParameters.enamelVariants.forEach((x) => form.enamelVariantSelect.add(new Option(x, x)));
-    data.finishParameters.coatingSides.forEach((x) => form.finishSidesSelect.add(new Option(x, x)));
+    data.finishParameters.coatingSides.forEach((x) => form.finishSidesSelect.add(new Option(finishSidesLabel(x), x)));
     priceListClientConditions().forEach((x) => form.clientConditionSelect.add(new Option(clientConditionUiName(x.id), x.id)));
 
     updateVeneerThicknessOptions({ preserve: false });
@@ -9644,6 +9650,7 @@
       input.addEventListener('change',()=>{updateSizeTransitionUI(row);recalc();});
     });
     arrangeDetailedSideFields();
+    Array.from(form.finishSidesSelect.options).forEach(option => { option.textContent = finishSidesLabel(option.value); });
     ["attached", "separate"].forEach(which => syncEdgeThicknessOptions(which, { preserve: true }));
     if (isQuickManufacturedPanel()) {
       [form.edgeModeSelect, form.edgeTypeSelect, form.edgeBevelSelect].forEach(input =>
