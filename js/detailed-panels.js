@@ -386,6 +386,19 @@
   const STANDARD_LACQUER_EXECUTION = "standard";
   const GLOSS_100_EXECUTION = "gloss100";
 
+  function enamelVariantLabel(value) {
+    return value === "Грунт + патина + эмаль + лак" ? "Грунт + эмаль + патина + лак" : value;
+  }
+
+  function enamelSchemeDescription(value) {
+    const descriptions = {
+      "Грунт + эмаль": "Грунт + эмаль. Базовое цветное покрытие, эмаль полностью закрывает древесину.",
+      "Грунт + эмаль + лак": "Грунт + эмаль + лак. Сверху эмали добавляется слой лака. Покрытие лучше переносит износ и мытьё, а блеск можно выбрать.",
+      "Грунт + патина + эмаль + лак": "Грунт + эмаль + патина + лак. Декоративная отделка: патина выделяет поры и рельеф древесины другим оттенком, получается эффект состаренной поверхности. Лак сверху защищает."
+    };
+    return descriptions[value] ? descriptions[value] + "\nЭмаль закрывает древесину цветом. Лак поверх эмали добавляет защиту, патина создаёт декоративный эффект состаренной поверхности. Чем больше слоёв, тем выше цена." : "";
+  }
+
   function coatingSchemeDescription(id) {
     const descriptions = {
       primer_lacquer: "Грунт + лак. Базовое покрытие, структура древесины ощущается под рукой. Для стеновых панелей и декоративных элементов.",
@@ -680,7 +693,7 @@
       }
     }
     if (normalized.finishId === "enamel" && !normalized.enamelVariant) {
-      issues.push({ field: "enamel", message: "Выберите технологическую схему эмали." });
+      issues.push({ field: "enamel", message: "Выберите схему покрытия." });
     }
     return { valid: issues.length === 0, issues, config: normalized };
   }
@@ -706,7 +719,7 @@
       if (normalized.toning === "yes") parts.push("тонировка");
       if (normalized.isolator === "yes") parts.push("изолятор");
     }
-    if (normalized.finishId === "enamel" && normalized.enamelVariant) parts.push(normalized.enamelVariant);
+    if (normalized.finishId === "enamel" && normalized.enamelVariant) parts.push(enamelVariantLabel(normalized.enamelVariant));
     return parts.join(" · ");
   }
 
@@ -1159,7 +1172,9 @@
   function arrangeDetailedSideFields() {
     if (!isDetailedPanelCalculation()) return;
     form.lacquerProcessField?.querySelector(".field__label") && (form.lacquerProcessField.querySelector(".field__label").textContent = "Схема покрытия");
+    form.enamelVariantSelect.closest(".field").querySelector(".field__label").textContent = "Схема покрытия";
     const descriptions = [
+      [form.enamelVariantSelect, "enamelSchemeDefinition", enamelSchemeDescription(form.enamelVariantSelect.value)],
       [form.lacquerProcessSelect, "coatingSchemeDefinition", coatingSchemeDescription(form.lacquerProcessSelect.value)],
       [form.calibrationSelect, "calibrationDefinition", "Калибровка основы. Шлифовка основы до точной толщины, чтобы готовая деталь со шпоном получилась нужного размера."],
       [form.finishSelect, "finishDefinition", "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.\nЛак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.\nЭмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру."],
@@ -1170,7 +1185,7 @@
       let note = el(id);
       if (!note) { note = document.createElement("span"); note.id = id; note.className = "field__note"; control.after(note); }
       note.textContent = text;
-      if (id === "coatingSchemeDefinition") note.classList.toggle("is-hidden", !text);
+      if (id === "coatingSchemeDefinition" || id === "enamelSchemeDefinition") note.classList.toggle("is-hidden", !text);
       note.style.whiteSpace = "pre-line";
       control.setAttribute("aria-describedby", [control.getAttribute("aria-describedby"), id].filter(Boolean).join(" ").split(/\s+/).filter((item,index,all)=>all.indexOf(item)===index).join(" "));
     });
@@ -8107,6 +8122,9 @@
       form.finalPriceValue.textContent = "—";
       form.finalPriceNote.textContent = calculationBlockingMessage(lastCalculation);
     }
+    if (isDetailedPanelCalculation() && el("enamelSchemeDefinition")) {
+      const note=el("enamelSchemeDefinition"); note.textContent=enamelSchemeDescription(form.enamelVariantSelect.value); note.classList.toggle("is-hidden", !note.textContent);
+    }
     if (isDetailedPanelCalculation() && el("coatingSchemeDefinition")) {
       const note=el("coatingSchemeDefinition");
       note.textContent=coatingSchemeDescription(form.lacquerProcessSelect.value);
@@ -8218,8 +8236,8 @@
     const current = form.enamelVariantSelect.value;
     const options = data?.finishParameters?.enamelVariants || [];
     form.enamelVariantSelect.innerHTML = "";
-    form.enamelVariantSelect.add(new Option("Выберите технологическую схему", ""));
-    options.forEach((value) => form.enamelVariantSelect.add(new Option(value, value)));
+    form.enamelVariantSelect.add(new Option("Выберите схему покрытия", ""));
+    options.forEach((value) => form.enamelVariantSelect.add(new Option(enamelVariantLabel(value), value)));
     if (options.includes(current)) form.enamelVariantSelect.value = current;
     else form.enamelVariantSelect.value = "";
   }
@@ -8250,7 +8268,7 @@
         lacquerExecution: $('[data-position-lacquer-execution]', card)?.value || previous.lacquerExecution || STANDARD_LACQUER_EXECUTION,
         lacquerGloss: $('[data-position-lacquer-gloss]', card)?.value || previous.lacquerGloss || "",
         lacquerProcess: $('[data-position-lacquer-process]', card)?.value ?? previous.lacquerProcess ?? "",
-        enamelVariant: $('[data-position-enamel-variant]', card)?.value || previous.enamelVariant || "",
+        enamelVariant: $('[data-position-enamel-variant]', card)?.value ?? previous.enamelVariant ?? "",
         sides: $('[data-position-finish-sides]', card)?.value || previous.sides || defaultFinishSides(),
         sidesManual: Boolean(previous.sidesManual),
         isolator: $('[data-position-isolator]', card)?.value || previous.isolator || "no"
@@ -8324,7 +8342,7 @@
       const lacquerProcesses = acrylic ? availableLacquerProcesses(state.sides) : [];
       const glossHtml = [`<option value="">Выберите степень блеска</option>`, ...glossOptions.map((value) => `<option value="${esc(value)}"${state.lacquerGloss === value ? " selected" : ""}>${esc(value)}</option>`)].join("");
       const processHtml = [`<option value="">Выберите схему покрытия</option>`, ...lacquerProcesses.map((item) => `<option value="${esc(item.id)}"${state.lacquerProcess === item.id ? " selected" : ""}>${esc(item.name)}</option>`)].join("");
-      const enamelHtml = [`<option value="">Выберите технологическую схему</option>`, ...(data.finishParameters.enamelVariants || []).map((value) => `<option value="${esc(value)}"${state.enamelVariant === value ? " selected" : ""}>${esc(value)}</option>`)].join("");
+      const enamelHtml = [`<option value="">Выберите схему покрытия</option>`, ...(data.finishParameters.enamelVariants || []).map((value) => `<option value="${esc(value)}"${state.enamelVariant === value ? " selected" : ""}>${esc(enamelVariantLabel(value))}</option>`)].join("");
 
       return `<div class="finish-position-card" data-position-finish-row="${esc(rowId)}">
         <div class="finish-position-card__head">
@@ -8346,7 +8364,7 @@
           <label class="field"><span class="field__label">Тонировка</span><select data-position-toning><option value="no"${state.toning !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.toning === "yes" ? " selected" : ""}>Да</option></select></label>
           <label class="field"><span class="field__label">Изолятор</span><select data-position-isolator><option value="no"${state.isolator !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.isolator === "yes" ? " selected" : ""}>Да</option></select><span class="field__note">Изолятор. Защитный слой под лаком. Нужен для пород с маслом или смолой в древесине: без него они проступают сквозь лак пятнами.</span></label>
         </div>` : ""}
-        ${enamel ? `<label class="field"><span class="field__label">Технологическая схема эмали</span><select data-position-enamel-variant>${enamelHtml}</select><span class="field__error is-hidden" data-validation-error data-position-enamel-error></span></label>` : ""}
+        ${enamel ? `<label class="field"><span class="field__label">Схема покрытия</span><select data-position-enamel-variant>${enamelHtml}</select><span class="field__note${state.enamelVariant ? "" : " is-hidden"}" style="white-space:pre-line">${esc(enamelSchemeDescription(state.enamelVariant))}</span><span class="field__error is-hidden" data-validation-error data-position-enamel-error></span></label>` : ""}
       </div>`;
     }).join("");
   }
@@ -9607,7 +9625,7 @@
       if (e.target.matches('[data-position-lacquer-process]')) markFieldTouched(`positionFinish:${rowId}:process`);
       if (e.target.matches('[data-position-enamel-variant]')) markFieldTouched(`positionFinish:${rowId}:enamel`);
       capturePositionFinishStateFromDom();
-      if (e.target.matches('[data-position-finish-select],[data-position-lacquer-execution],[data-position-toning],[data-position-finish-sides],[data-position-lacquer-process]')) {
+      if (e.target.matches('[data-position-finish-select],[data-position-lacquer-execution],[data-position-toning],[data-position-finish-sides],[data-position-lacquer-process],[data-position-enamel-variant]')) {
         renderPositionFinishOverrides();
       } else {
         updatePositionFinishLabels();
