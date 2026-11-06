@@ -386,7 +386,15 @@
   const STANDARD_LACQUER_EXECUTION = "standard";
   const GLOSS_100_EXECUTION = "gloss100";
 
-  const coatingSchemeDescription = "Грунт + лак. Базовое покрытие, структура древесины ощущается под рукой. Для стеновых панелей и декоративных элементов.\nГрунт + грунт + лак. Поверхность ровнее, поры почти не видны. Для мебели и фасадов.\nГрунт + грунт + лак +лак. Самая ровная поверхность и самый плотный защитный слой. Для фасадов и столешниц с активной нагрузкой.\nЧем больше слоёв, тем ровнее поверхность, плотнее защита и выше цена. Если клиент не уточнял, выбирайте «Грунт и лак».";
+  function coatingSchemeDescription(id) {
+    const descriptions = {
+      primer_lacquer: "Грунт + лак. Базовое покрытие, структура древесины ощущается под рукой. Для стеновых панелей и декоративных элементов.",
+      double_primer_lacquer: "Грунт + грунт + лак. Поверхность ровнее, поры почти не видны. Для мебели и фасадов.",
+      double_primer_double_lacquer: "Грунт + грунт + лак +лак. Самая ровная поверхность и самый плотный защитный слой. Для фасадов и столешниц с активной нагрузкой."
+    };
+    const description = descriptions[String(id || "").replace(/_back_primer$/, "")];
+    return description ? description + "\nЧем больше слоёв, тем ровнее поверхность, плотнее защита и выше цена. Если клиент не уточнял, выбирайте «Грунт и лак»." : "";
+  }
 
   function finishDescription(id) {
     return {
@@ -1152,7 +1160,7 @@
     if (!isDetailedPanelCalculation()) return;
     form.lacquerProcessField?.querySelector(".field__label") && (form.lacquerProcessField.querySelector(".field__label").textContent = "Схема покрытия");
     const descriptions = [
-      [form.lacquerProcessSelect, "coatingSchemeDefinition", coatingSchemeDescription],
+      [form.lacquerProcessSelect, "coatingSchemeDefinition", coatingSchemeDescription(form.lacquerProcessSelect.value)],
       [form.calibrationSelect, "calibrationDefinition", "Калибровка основы. Шлифовка основы до точной толщины, чтобы готовая деталь со шпоном получилась нужного размера."],
       [form.finishSelect, "finishDefinition", "Лак акриловый. Прозрачное покрытие на водной основе, сохраняет рисунок и цвет шпона, подходит для стен и мебели без высокой нагрузки.\nЛак полиуретановый. Прозрачное покрытие повышенной прочности, лучше переносит частые прикосновения и влажную уборку, подходит для коридоров, холлов и общественных помещений.\nЭмаль. Непрозрачное цветное покрытие, перекрывает рисунок шпона, но сохраняет его фактуру."],
       [form.isolatorSelect, "isolatorDefinition", "Изолятор. Защитный слой под лаком. Нужен для пород с маслом или смолой в древесине: без него они проступают сквозь лак пятнами."],
@@ -1162,6 +1170,7 @@
       let note = el(id);
       if (!note) { note = document.createElement("span"); note.id = id; note.className = "field__note"; control.after(note); }
       note.textContent = text;
+      if (id === "coatingSchemeDefinition") note.classList.toggle("is-hidden", !text);
       note.style.whiteSpace = "pre-line";
       control.setAttribute("aria-describedby", [control.getAttribute("aria-describedby"), id].filter(Boolean).join(" ").split(/\s+/).filter((item,index,all)=>all.indexOf(item)===index).join(" "));
     });
@@ -8098,6 +8107,11 @@
       form.finalPriceValue.textContent = "—";
       form.finalPriceNote.textContent = calculationBlockingMessage(lastCalculation);
     }
+    if (isDetailedPanelCalculation() && el("coatingSchemeDefinition")) {
+      const note=el("coatingSchemeDefinition");
+      note.textContent=coatingSchemeDescription(form.lacquerProcessSelect.value);
+      note.classList.toggle("is-hidden", !note.textContent);
+    }
     if (isDetailedPanelCalculation() && el("finishDefinition")) {
       const note=el("finishDefinition"); note.textContent=finishDescription(form.finishSelect.value); note.classList.toggle("is-hidden", !note.textContent);
     }
@@ -8235,7 +8249,7 @@
         toning: $('[data-position-toning]', card)?.value || previous.toning || "no",
         lacquerExecution: $('[data-position-lacquer-execution]', card)?.value || previous.lacquerExecution || STANDARD_LACQUER_EXECUTION,
         lacquerGloss: $('[data-position-lacquer-gloss]', card)?.value || previous.lacquerGloss || "",
-        lacquerProcess: $('[data-position-lacquer-process]', card)?.value || previous.lacquerProcess || "",
+        lacquerProcess: $('[data-position-lacquer-process]', card)?.value ?? previous.lacquerProcess ?? "",
         enamelVariant: $('[data-position-enamel-variant]', card)?.value || previous.enamelVariant || "",
         sides: $('[data-position-finish-sides]', card)?.value || previous.sides || defaultFinishSides(),
         sidesManual: Boolean(previous.sidesManual),
@@ -8326,7 +8340,7 @@
         ${finishId === "lacquer_polyester" ? `<label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss disabled><option value="100%">100%</option></select></label>` : ""}
         ${!gloss100 ? `<div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Степень блеска</span><select data-position-lacquer-gloss>${glossHtml}</select><span class="field__error is-hidden" data-validation-error data-position-lacquer-gloss-error></span></label>
-          ${acrylic ? `<label class="field"><span class="field__label">Схема покрытия</span><select data-position-lacquer-process>${processHtml}</select><span class="field__note" style="white-space:pre-line">${esc(coatingSchemeDescription)}</span><span class="field__error is-hidden" data-validation-error data-position-lacquer-process-error></span></label>` : ""}
+          ${acrylic ? `<label class="field"><span class="field__label">Схема покрытия</span><select data-position-lacquer-process>${processHtml}</select><span class="field__note${state.lacquerProcess ? "" : " is-hidden"}" style="white-space:pre-line">${esc(coatingSchemeDescription(state.lacquerProcess))}</span><span class="field__error is-hidden" data-validation-error data-position-lacquer-process-error></span></label>` : ""}
         </div>` : ""}
         <div class="field-grid field-grid--two">
           <label class="field"><span class="field__label">Тонировка</span><select data-position-toning><option value="no"${state.toning !== "yes" ? " selected" : ""}>Нет</option><option value="yes"${state.toning === "yes" ? " selected" : ""}>Да</option></select></label>
@@ -9593,7 +9607,7 @@
       if (e.target.matches('[data-position-lacquer-process]')) markFieldTouched(`positionFinish:${rowId}:process`);
       if (e.target.matches('[data-position-enamel-variant]')) markFieldTouched(`positionFinish:${rowId}:enamel`);
       capturePositionFinishStateFromDom();
-      if (e.target.matches('[data-position-finish-select],[data-position-lacquer-execution],[data-position-toning],[data-position-finish-sides]')) {
+      if (e.target.matches('[data-position-finish-select],[data-position-lacquer-execution],[data-position-toning],[data-position-finish-sides],[data-position-lacquer-process]')) {
         renderPositionFinishOverrides();
       } else {
         updatePositionFinishLabels();
