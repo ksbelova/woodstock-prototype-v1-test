@@ -69,6 +69,7 @@
    return [...new Set(raw.map(clientWarningReason).filter(Boolean))];
  }
  function preliminaryPartialText(result,boring){
+  if(result?.pricingUnavailable)return "Полиэфирный лак: сначала требуется найти производство и согласовать возможность изготовления. Стоимость заказа уточняет менеджер.";
    const reasons=clientWarningReasons(result,boring);
    const list=reasons.length?reasons.join('; '):'стоимость материалов или работ, которые требуется уточнить';
    return 'Это предварительный расчёт. В сумму пока не вошли: '+list+'. Менеджер уточнит детали заказа и назовёт стоимость, максимально близкую к итоговой';
@@ -108,7 +109,7 @@
    $('quickFinishExplanation').textContent=text;
    $('quickFinishExplanation').classList.toggle('is-hidden',!text);
   }
-  if(wall||scenario==='details') $('quickToningField')?.remove();
+  if(wall||scenario==='details'){ $('quickToningField')?.remove(); $('quickPatternTransition')?.closest('label')?.remove(); }
   // The short scenario selects the documented finish process, then the existing controller prices it.
   const process=form.finishSelect.value==='lacquer_acrylic'&&form.lacquerProcessSelect.value===''?'primer_lacquer':null;
   if(process&&[...form.lacquerProcessSelect.options].some(o=>o.value===process)){
@@ -120,7 +121,7 @@
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
   removeReviewNotes();
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
-  $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
+  $('resultTotal').textContent=result?.pricingUnavailable?'Стоимость уточняется':!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
   $('priceLabel').textContent='Ориентировочная стоимость с НДС';
   $('partialWarning').classList.toggle('is-hidden',!partial);
   $('partialWarning').textContent=partial?preliminaryPartialText(result,boring):'';
@@ -154,7 +155,7 @@
   const boring=$('boringSelect')?.value==='yes';
   const rows=record.sizes.map(row=>{
    const partial=row.pricingPartial||boring;
-   const value=amount=>money(amount)+(partial&&Number.isFinite(amount)?' *':'');
+   const value=amount=>result.pricingUnavailable?'Уточняется':money(amount)+(partial&&Number.isFinite(amount)?' *':'');
    const classification=standard&&['warehouse_standard','standard_request'].includes(row.classificationId)?row.classificationName:'';
    return [
    String(row.position),[record.title,classification].filter(Boolean).join('\n'),
@@ -167,18 +168,12 @@
   const notes=[{text:preliminaryDisclaimer,style:'infoSmall',margin:[0,4,0,8]}];
   const rowPartial=record.sizes.some(row=>row.pricingPartial)||boring;
   if(rowPartial)notes.push({text:'* Частичная стоимость позиции: учтены только рассчитанные составляющие.',style:'infoSmall'});
-  if(Number.isFinite(result.orderLevelUnallocatedCost)&&Math.abs(result.orderLevelUnallocatedCost)>0.000001)notes.push({text:'Общие рассчитанные затраты заказа, не распределённые по изделиям: '+money(result.orderLevelUnallocatedCost)+'. Они включены в итог один раз.',style:'infoSmall'});
-  const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const rowRounding=round(round(result.finalTotal)-record.sizes.reduce((sum,row)=>sum+round(row.knownSubtotal||0),0)-round(result.orderLevelUnallocatedCost||0));
-  const breakdownRounding=round(round(result.finalTotal)-result.breakdown.reduce((sum,item)=>sum+round(item.value),0));
-  if(rowRounding||breakdownRounding)notes.push({text:'Расчёт выполнен без промежуточного округления. Разница округления: по позициям '+money(rowRounding)+'; по составляющим '+money(breakdownRounding)+'.',style:'infoSmall'});
   if(certified)notes.push({text:"ГСП: состав кромки и покрытия по сертификату КМ1 подтверждает производство.",style:"infoText"});
   if(partial)notes.push({text:preliminaryPartialText(result,boring),style:'infoText',margin:[0,8,0,4]});
-  notes.push({text:'Рассчитанные составляющие',style:'sectionTitle'},{table:{headerRows:1,dontBreakRows:true,widths:Common.fitPdfTableWidths([360,179],3),body:[[{text:'Составляющая',bold:true},{text:'Стоимость с НДС',bold:true}],...result.breakdown.map(x=>[x.label,money(x.value)])]},layout:Common.pdfTableLayout()});
+
   if(edge.mode!=='none')notes.push({text:'Кромка — данные отдельной спецификации',style:'sectionTitle'},{text:edgeText,style:'infoSmall'});
   const files=[...new Set([...contact.fileNames(),...(record.layoutTzFiles||[]),...record.sizes.flatMap(row=>row.files||[])])];
   if(record.layoutTzComment)notes.push({text:'Требования к раскладке: '+record.layoutTzComment,style:'infoText'});
-  if(wall||scenario==='details') notes.push({text:(wall?'Переход рисунка на панелях: ':'Переход рисунка на деталях: ')+(record.patternTransitionRequested?'да':'нет'),style:'infoText'});
   notes.push({text:'Дополнительные требования',style:'sectionTitle'},{text:record.comment||'—',style:'infoText'},{text:'Файлы: '+(files.join(', ')||'нет'),style:'infoSmall'},{text:'Связь с менеджером: '+($('managerContactInput').checked?'нужна':'не запрошена'),style:'infoSmall'});
   return {dontBreakRows:false,title,numberPrefix:'КР-ПЛ-',subtitle:'Краткий расчёт плит',preliminaryPriceLabels:true,widths:[12,52,110,103,57,24,38,65,65],header:['№','Основа','Шпон','Раскладка и обработка','Размер, мм','Шт.','Площадь, м²','Цена с НДС','Сумма с НДС'].map(text=>({text,style:'tableHeader'})),rows,afterPrice:notes};
  }
@@ -204,11 +199,11 @@
   if(scenario==='details'&&$('boringSelect').value==='yes'&&!contact.fileNames().length){$('saveStatus').textContent='Для присадки приложите чертёж.';return;}
   // This is the detailed calculation's own validation and serialization, without writing a specification item.
   const record=api.capture();if(!record)return;
-  if(wall||scenario==='details') record.patternTransitionRequested=Boolean($('quickPatternTransition')?.checked);
+  delete record.patternTransitionRequested;
   const result=api.result();
   if($('boringSelect')?.value==='yes')record.sizes.forEach(row=>{row.pricingPartial=true;row.pricingComplete=false;row.total=null;row.pricePerM2=null;row.pricePerPiece=null;row.pendingCosts=[...(row.pendingCosts||[]),'Присадка: стоимость производства'];});
   const f=contactForm(),partial=!result.priceCalculationComplete||$('boringSelect')?.value==='yes';
-  const payload={createdAt:record.createdAt,pricing:{total:result.finalTotal,finalPricePerM2:result.avgM2,vat:result.vat,partial},contact:{name:f.name.value.trim(),phone:f.phone.value.trim(),city:f.city.value.trim(),email:contact.normalizeEmail(f.email.value),comment:f.comment.value.trim(),files:contact.fileNames(),callbackRequested:f.managerContact.checked,privacyAccepted:f.privacy.checked}};
+  const payload={createdAt:record.createdAt,pricing:{total:result.pricingUnavailable?null:result.finalTotal,finalPricePerM2:result.pricingUnavailable?null:result.avgM2,vat:result.pricingUnavailable?null:result.vat,partial},contact:{name:f.name.value.trim(),phone:f.phone.value.trim(),city:f.city.value.trim(),email:contact.normalizeEmail(f.email.value),comment:f.comment.value.trim(),files:contact.fileNames(),callbackRequested:f.managerContact.checked,privacyAccepted:f.privacy.checked}};
   try{localStorage.setItem('woodstockQuickPanelsCalculation',JSON.stringify({...record,...($('boringSelect')?.value==='yes'?{boring:{required:true,pricingStatus:'production'},pricingPartial:true,requiresProductionCost:true,total:null,knownSubtotal:result.finalTotal}:{}),contact:payload.contact}));}catch(error){console.warn('Не удалось сохранить расчёт локально:',error);}
   Common.downloadSpecification(payload,productDocument(record,result),`woodstock-panels-${scenario}-specification.pdf`,$('saveStatus'),()=>{$('saveStatus').textContent='Спецификация и расчёт скачаны в PDF.';Common.openDownloadModal($('downloadModal'));});
  }

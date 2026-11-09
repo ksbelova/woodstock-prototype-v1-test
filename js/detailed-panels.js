@@ -3659,8 +3659,7 @@
       size.technologicalSizeValid = technologicalState.valid;
       size.technologicalSizeLimit = technologicalState.limit;
       size.minimumSizeValid = manufacturingType !== "exact" || !(length > 0 && width > 0) || (length >= 50 && width >= 50);
-      size.integerDimensionsValid = !isDetailedPanelCalculation() ||
-        ((length === null || Number.isInteger(length)) && (width === null || Number.isInteger(width)));
+      size.integerDimensionsValid = ((length === null || Number.isInteger(length)) && (width === null || Number.isInteger(width)));
       size.sizeValid = physicalSizeValid && technologicalState.valid && size.minimumSizeValid && standardSizeAvailable && size.integerDimensionsValid;
       size.area = length && width && quantity && size.sizeValid ? length * width * quantity / 1_000_000 : 0;
       size.calcArea = calcLength && calcWidth && quantity && size.sizeValid ? calcLength * calcWidth * quantity / 1_000_000 : 0;
@@ -3924,7 +3923,7 @@
       return false;
     }
 
-    if (isDetailedPanelCalculation() && !Number.isInteger(value)) {
+    if (!Number.isInteger(value)) {
       recalc();
       setSizeFieldError(row, key, `${label}: введите целое число миллиметров.`);
       return false;
