@@ -1495,43 +1495,14 @@
       .replace(/\s+/g, " ");
   }
 
-  function edgeLookupTokens(value) {
-    return normalizeEdgeLookup(value)
-      .replace(/[^a-zа-я0-9]+/giu, " ")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-  }
-
-  function edgeGroupMatchScore(groupName, sourceName) {
-    const group = normalizeEdgeLookup(groupName);
-    const source = normalizeEdgeLookup(sourceName);
-    if (!group || !source) return 0;
-    if (group === source) return 10000 + group.length;
-
-    const groupTokens = edgeLookupTokens(group);
-    const sourceTokens = new Set(edgeLookupTokens(source));
-    if (!groupTokens.length || !groupTokens.every((token) => sourceTokens.has(token))) return 0;
-
-    // Прайс кромки хранит часть пород укрупнённо (например, «Дуб», «Орех»),
-    // а шпон — с уточнением породы/декора («Дуб белый», «Орех американский»).
-    // Считаем такую позицию тем же прайсовым семейством, но не подменяем
-    // более специфичную группу: «Ясень Белый» должен выигрывать у гипотетического «Ясень».
-    return groupTokens.length * 100 + group.length;
-  }
-
   function findEdgeNameGroup(typeId, value) {
     if (!typeId || !String(value || "").trim()) return null;
-    // Preserve existing stock-family matching; order materials require exact names.
+    const normalized = normalizeEdgeLookup(value);
     const groups = edgeNameGroups(typeId);
-    const stock = groups.filter(item => item.stockProgram)
-      .map(item => ({item, score: edgeGroupMatchScore(item.displayName, value)}))
-      .filter(entry => entry.score > 0)
-      .sort((a,b) => b.score-a.score || b.item.displayName.length-a.item.displayName.length)[0]?.item;
-    if (stock) return stock;
-    const matches = groups.filter(item => !item.stockProgram && [item.displayName,...(item.aliases || [])]
-      .some(name => normalizeEdgeLookup(name) === normalizeEdgeLookup(value)));
-    return matches.length === 1 ? matches[0] : null;
+    const exact = groups.find(item => normalizeEdgeLookup(item.displayName) === normalized);
+    if (exact) return exact;
+    const aliases = groups.filter(item => (item.aliases || []).some(name => normalizeEdgeLookup(name) === normalized));
+    return aliases.length === 1 ? aliases[0] : null;
   }
 
   function edgeTypeById(typeId) {
@@ -9792,6 +9763,7 @@
       [form.edgeModeSelect, form.edgeTypeSelect, form.edgeBevelSelect].forEach(input =>
         input.closest(".field")?.setAttribute("data-quick-hidden", ""));
     }
+    syncEdgeVeneerDefaults();
     if(positionFinishOverridesEnabled)renderPositionFinishOverrides(false);
     if(positionEdgeOverridesEnabled)renderPositionEdgeOverrides(false);
     recalc();
