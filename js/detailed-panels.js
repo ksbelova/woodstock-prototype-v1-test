@@ -665,7 +665,7 @@
     return {
       ...source,
       finishId,
-      toning: lacquer && source.toning === "yes" ? "yes" : "no",
+      toning: !isQuickManufacturedPanel() && lacquer && source.toning === "yes" ? "yes" : "no",
       lacquerExecution,
       lacquerGloss: finishId === "lacquer_polyester" ? "100%" : lacquerGloss,
       lacquerProcess,
@@ -3424,6 +3424,10 @@
   }
 
   function updateSizeTransitionUI(row) {
+    if (isQuickWallPanel() || isQuickDetailsPanel()) {
+      const checkbox = $('[data-size-transition]', row);
+      if (checkbox) { checkbox.checked = false; checkbox.disabled = true; checkbox.closest('.toggle-line')?.classList.add('is-hidden'); }
+    }
     const transition = !isQuickWallPanel() && !isQuickDetailsPanel() && !isQuickStandardPanel() && Boolean($('[data-size-transition]', row)?.checked);
     const quantityState = quantityValueState(row);
     const quantity = quantityState.value;
@@ -8029,6 +8033,7 @@
   }
 
   function recalc() {
+    if (isQuickWallPanel() || isQuickDetailsPanel()) form.toningSelect.value = "no";
     syncQuickWallBack();
     syncQuickPaperBack();
     syncDetailedPaperBack();

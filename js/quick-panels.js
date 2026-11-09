@@ -108,11 +108,7 @@
    $('quickFinishExplanation').textContent=text;
    $('quickFinishExplanation').classList.toggle('is-hidden',!text);
   }
-  if((wall||scenario==='details')&&$('quickToningField')) {
-   const lacquer=['lacquer_acrylic','lacquer_polyurethane'].includes(form.finishSelect.value);
-   $('quickToningField').classList.toggle('is-hidden',!lacquer);
-   $('quickToningCheckbox').checked=lacquer&&form.toningSelect.value==='yes';
-  }
+  if(wall||scenario==='details') $('quickToningField')?.remove();
   // The short scenario selects the documented finish process, then the existing controller prices it.
   const process=form.finishSelect.value==='lacquer_acrylic'&&form.lacquerProcessSelect.value===''?'primer_lacquer':null;
   if(process&&[...form.lacquerProcessSelect.options].some(o=>o.value===process)){
@@ -226,10 +222,7 @@
   $('getCalculationButton').addEventListener('click',submit);
   // Присадка влияет на полноту стоимости, обновляем чек без другого действия.
   $('boringSelect')?.addEventListener('change',()=>render(api.result()));
-  if(wall||scenario==='details') $('quickToningCheckbox')?.addEventListener('change',()=>{
-   api.form.toningSelect.value=['lacquer_acrylic','lacquer_polyurethane'].includes(api.form.finishSelect.value)&&$('quickToningCheckbox').checked?'yes':'no';
-   api.form.toningSelect.dispatchEvent(new Event('change',{bubbles:true}));
-  });
+
   $('downloadModalClose').addEventListener('click',()=>Common.closeDownloadModal($('downloadModal')));
   $('downloadModal').addEventListener('click',event=>{if(event.target===$('downloadModal'))Common.closeDownloadModal($('downloadModal'));});
   api.form.root.addEventListener('submit',event=>{event.preventDefault();submit();});
