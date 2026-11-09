@@ -1709,7 +1709,9 @@
 
   function syncEdgeWidthOptions(which = "attached", { preserve = true } = {}) {
     const controls = edgeControls(which);
-    controls.orderWidthInput.readOnly = isQuickDetailsPanel() && which === "attached";
+    const automaticAttached = which === "attached" && (isDetailedPanelCalculation() || isQuickDetailsPanel());
+    if (automaticAttached) edgeWidthAutomatic.attached = true;
+    controls.orderWidthInput.readOnly = automaticAttached;
     const type = edgeTypeById(controls.typeSelect?.value);
     const rawName = controls.materialInput.value.trim();
     const group = edgeNameGroupForInput(which);
@@ -1761,7 +1763,7 @@
     controls.widthSelect.add(new Option("Выберите ширину кромки", ""));
     const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
     widths.forEach((width) => controls.widthSelect.add(new Option(`${width} мм`, String(width))));
-    controls.widthSelect.disabled = isQuickDetailsPanel() && which === "attached";
+    controls.widthSelect.disabled = automaticAttached;
     if (!edgeWidthAutomatic[which] && Number.isFinite(previous) && widths.includes(previous)) {
       controls.widthSelect.value = String(previous);
     } else if (widths.length) {
@@ -4079,6 +4081,13 @@
     return { mode: "inherit", sidesId: form.edgeSidesSelect.value || "", thicknessMm: currentEdgeThickness("attached"), widthMm: num(form.edgeWidthSelect.value) || num(form.edgeOrderWidthInput.value) };
   }
 
+  function automaticPositionEdgeWidth(thicknessMm) {
+    const item = resolveEdgeCatalogItem("attached", { thicknessMm });
+    const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
+    const stock = edgeWidthPeers(item).filter(other=>!other.orderedProgram).flatMap(edgeCatalogWidths).filter(edgeWidthFitsProduct).sort((a,b)=>a-b);
+    return stock[0] || widths[0] || num(form.edgeOrderWidthInput.value);
+  }
+
   function normalizePositionEdgeState(state = {}) {
     const mode = ["inherit", "custom", "none"].includes(state.mode) ? state.mode : "inherit";
     const validSideIds = new Set((data?.edgeSides || []).map((item) => item.id));
@@ -4086,7 +4095,7 @@
     const allowed = Array.from(form.edgeThicknessSelect.options).map(option => Number(option.value)).filter(value => value > 0);
     const value = num(state.thicknessMm);
     const thicknessMm = allowed.includes(value) ? value : currentEdgeThickness("attached");
-    return { mode, sidesId, thicknessMm, widthMm: num(state.widthMm) };
+    return { mode, sidesId, thicknessMm, widthMm: isDetailedPanelCalculation() ? automaticPositionEdgeWidth(thicknessMm) : num(state.widthMm) };
   }
 
   function capturePositionEdgeStateFromDom() {
@@ -4132,8 +4141,8 @@
     const item = resolveEdgeCatalogItem("attached", { thicknessMm: state.thicknessMm });
     const widths = edgeAvailableWidths(item).filter(edgeWidthFitsProduct);
     return item
-      ? `<select data-position-edge-width><option value="">Выберите ширину</option>${widths.map((width) => `<option value="${esc(width)}"${Number(state.widthMm) === Number(width) ? " selected" : ""}>${width} мм</option>`).join("")}</select>`
-      : `<input data-position-edge-width type="number" min="1" value="${esc(state.widthMm || "")}" />`;
+      ? `<select data-position-edge-width${isDetailedPanelCalculation() ? " disabled" : ""}><option value="">Выберите ширину</option>${widths.map((width) => `<option value="${esc(width)}"${Number(state.widthMm) === Number(width) ? " selected" : ""}>${width} мм</option>`).join("")}</select>`
+      : `<input data-position-edge-width${isDetailedPanelCalculation() ? " readonly" : ""} type="number" min="1" value="${esc(state.widthMm || "")}" />`;
   }
 
   function renderPositionEdgeOverrides(capture = true) {
