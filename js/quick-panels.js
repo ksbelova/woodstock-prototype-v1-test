@@ -75,36 +75,8 @@
  }
  // Внутренние вопросы из вкладок «Краткий» и «Второй круг правок».
  // Пометки принадлежат только интерфейсу: productDocument не читает их из DOM.
- function renderReviewNotes(){
-  const form=api.form,face=Number(form.veneerThicknessSelect.value);
-  const faceSelected=Boolean(form.veneerThicknessSelect.value);
-  const finish=form.finishSelect.value,toning=['lacquer_acrylic','lacquer_polyurethane'].includes(finish);
-  const note=(id,anchorId,text,visible=true)=>{
-   const anchor=$(anchorId);if(!anchor)return;
-   let element=$(id);
-   if(!element){
-    element=document.createElement('span');element.id=id;element.className='prototype-review-note';element.setAttribute('role','note');
-    const heading=document.createElement('strong');heading.textContent='Внутренняя пометка · требует согласования. ';
-    element.append(heading,document.createTextNode(text));
-    (anchor.closest('.field')||anchor).append(element);
-   }
-   element.classList.toggle('is-hidden',!visible);
-  };
-  if(wall){
-   note('quickOnePointFiveReviewNote','veneerThicknessSelect','Для стеновых панелей при толщине шпона на лицевой стороне 1,5 мм принят шпон с одной стороны и черновой шпон на обороте. Итоговый вариант нужно сообщить производству: ранее на встрече звучало правило о шпоне с двух сторон от 1,5 мм.',faceSelected&&Math.abs(face-1.5)<0.001);
-   note('quickTwoMmFinishReviewNote','veneerThicknessSelect','При толщине шпона на лицевой стороне 2 мм покрытие считается только по лицевой стороне, по аналогии с 2,5 мм. Применимость этого правила к 2 мм отдельно не подтверждена.',faceSelected&&Math.abs(face-2)<0.001);
-   note('quickEdgeWidthReviewNote','edgeThicknessSelect','Правило подбора ближайшей ширины кромки с запасом минимум 4 мм к итоговой толщине изделия выведено командой из примеров производства. Формулировка правила требует подтверждения.');
-   note('quickFinishDescriptionReviewNote','finishSelect','Описания свойств акрилового и полиуретанового лаков и эмали подготовлены командой по общим свойствам материалов. Их нужно сверить с покрытиями, которые использует Woodstock.',Boolean(finish)&&finish!=='none');
-   note('quickPolyurethaneReviewNote','finishSelect','Для полиуретанового лака нет подтверждённого тарифа: его стоимость не входит в предварительную сумму. Нужно согласовать, оставлять ли этот вариант в кратком расчёте.',finish==='lacquer_polyurethane');
-  }
-  if(standard){
-   const edge=form.edgeModeSelect.value==='separate';
-   note('quickSeparateEdgeWidthReviewNote','separateEdgeFields','Ширина временно подбирается по правилу стеновых панелей: ближайшая ширина из прайса с запасом минимум 4 мм к итоговой толщине плиты. Правило выведено командой из примеров производства. Для отдельной кромки может требоваться большая ширина; возможность её выбора клиентом пока не согласована.',edge);
-  }
-  if(wall||scenario==='details'){
-   note('quickToningRateReviewNote','quickToningField','В расчёте применяется доплата за тонировку 1000 ₽/м². Источник этого тарифа в записях встреч не указан; ставку нужно подтвердить у производства.',toning&&form.toningSelect.value==='yes');
-  }
-  if(scenario==='details')note('quickBoringDescriptionReviewNote','boringSelect','Вопрос и пояснение о присадке сформулированы командой. Диаметр отверстия под петлю 35 мм взят из свода правок и отдельно представителем производства не подтверждён.');
+ function removeReviewNotes(){
+  document.querySelectorAll('.prototype-review-note,#calibrationPurchaseReviewNote').forEach(note=>note.remove());
  }
  function render(result){
   if(syncing)return;
@@ -149,23 +121,8 @@
   if(form.finishSelect.value==='enamel'&&!form.enamelVariantSelect.value){syncing=true;form.enamelVariantSelect.value='Грунт + эмаль';api.recalculate();syncing=false;result=api.result();}
   const ready=!!result?.base&&!!result.validSizes?.length&&!api.issues().length&&(standard||certified||!!form.finishSelect.value);
   const boring=$('boringSelect')?.value==='yes';
-  // Внутренние отметки спорных допущений: они не влияют на цену и не входят в PDF.
-  const faceThickness=Number(form.veneerThicknessSelect.value);
-  const compensatorNote=$('quickCompensatorReviewNote');
-  if(compensatorNote){
-    const selected=Boolean(form.veneerThicknessSelect.value)&&[2,2.5].some(value=>Math.abs(faceThickness-value)<0.001);
-    compensatorNote.classList.toggle('is-hidden',!selected);
-  }
-  const roughOneMmNote=$('quickRoughOneMmReviewNote');
-  if(roughOneMmNote){
-    const roughSelected=Boolean(form.veneerThicknessSelect.value)
-      &&Math.abs(faceThickness-1)<0.001
-      &&Number(form.veneeredSidesSelect.value)===1
-      &&form.reverseSideSelect.value==='rough';
-    roughOneMmNote.classList.toggle('is-hidden',!roughSelected);
-  }
   const hasKnownPrice=Number.isFinite(result?.finalTotal)&&result.finalTotal>0;
-  renderReviewNotes();
+  removeReviewNotes();
   const partial=(hasKnownPrice||ready)&&(!ready||!result.priceCalculationComplete||boring);
   $('resultTotal').textContent=!hasKnownPrice&&!ready?'—':partial?(hasKnownPrice?money(result.finalTotal)+' *':'Стоимость рассчитает менеджер'):money(result.finalTotal);
   $('priceLabel').textContent='Ориентировочная стоимость с НДС';

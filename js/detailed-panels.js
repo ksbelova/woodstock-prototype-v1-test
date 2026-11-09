@@ -1202,14 +1202,7 @@
     }
     const baseBlock = form.baseSelect.closest("section");
     baseBlock.append(form.calibrationFields);
-    let purchaseNote = el("calibrationPurchaseReviewNote");
-    if (!purchaseNote) {
-      purchaseNote = document.createElement("p");
-      purchaseNote.id = "calibrationPurchaseReviewNote";
-      purchaseNote.className = "field-warning is-hidden";
-      purchaseNote.textContent = "Внутренняя пометка · проверить: калибровка фанеры и ДСП считается отдельной услугой. Уточнить, включена ли она в закупочную стоимость основы, чтобы исключить двойной учёт.";
-    }
-    baseBlock.append(purchaseNote);
+    document.querySelectorAll('.prototype-review-note,#calibrationPurchaseReviewNote').forEach(note=>note.remove());
     form.techVeneeringSummary.closest("section").hidden = true;
     form.sandingSelect.value = "yes";
     form.sandingSelect.disabled = true;
@@ -2532,7 +2525,6 @@
     const base = selectedBase();
     if (gspCalibrationIncluded(base)) {
       form.calibrationFields?.classList.add("is-hidden");
-      el("calibrationPurchaseReviewNote")?.classList.add("is-hidden");
       form.calibrationSelect.value = "yes";
       form.calibrationSelect.disabled = true;
       form.calibrationSelect.classList.add("is-hidden");
@@ -2550,7 +2542,6 @@
     const available = calibrationAvailableForBase(base);
     const required = calibrationRequiredForBase(base);
     form.calibrationFields?.classList.toggle("is-hidden", !available);
-    el("calibrationPurchaseReviewNote")?.classList.toggle("is-hidden", !separatelyPricedCalibration(base));
 
     if (!available) {
       form.calibrationSelect.disabled = false;
